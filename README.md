@@ -28,7 +28,7 @@
 
 ## 📁 폴더 구조 
 ```
-medicalapp/
+mfps/
 ├─ android/ # Android 네이티브 설정/빌드
 ├─ ios/ # iOS 네이티브 설정/빌드
 ├─ web/ # Web 실행/배포 설정
