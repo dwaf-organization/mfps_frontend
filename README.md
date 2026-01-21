@@ -16,7 +16,6 @@
 
 ## 🧱 기술 스택
 - Flutter / Dart
-- Riverpod(사용 시) / GoRouter(사용 시)
 - HTTP 통신 + 쿠키/세션 유지 헬퍼
 - Flutter Secure Storage
 
