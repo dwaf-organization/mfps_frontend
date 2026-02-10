@@ -11,7 +11,6 @@ import 'package:http/http.dart' as http;
 // ✅ Bluetooth 추가
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-
 import '../../../../urlConfig.dart';
 import 'patient_edit_dialog.dart';
 
@@ -50,7 +49,8 @@ class PatientDetailDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<PatientDetailDialog> createState() => _PatientDetailDialogState();
+  ConsumerState<PatientDetailDialog> createState() =>
+      _PatientDetailDialogState();
 }
 
 class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
@@ -90,6 +90,10 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
   bool _bleAutoPostEnabled = true;
   // =========================================================
 
+  // ✅ 비고 입력
+  final TextEditingController _remarkController = TextEditingController();
+  bool _savingRemark = false;
+
   @override
   void initState() {
     super.initState();
@@ -110,7 +114,8 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      if (token != null && token.trim().isNotEmpty) 'Authorization': 'Bearer ${token.trim()}',
+      if (token != null && token.trim().isNotEmpty)
+        'Authorization': 'Bearer ${token.trim()}',
     };
   }
 
@@ -118,6 +123,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     setState(() => _loading = true);
     try {
       await getData();
+      _remarkController.text = (_profile?.description ?? '').trim();
     } catch (e) {
       _snack('로딩 실패: $e');
     } finally {
@@ -182,7 +188,9 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
   /// GET /api/patient/profile?patient_code=1
   Future<PatientProfileDto> _fetchPatientProfile(int patientCode) async {
-    final uri = Uri.parse('$_front_url/api/patient/profile?patient_code=$patientCode');
+    final uri = Uri.parse(
+      '$_front_url/api/patient/profile?patient_code=$patientCode',
+    );
     final res = await http.get(uri, headers: await _headers());
 
     // debugPrint('[PROFILE] status=${res.statusCode} body=${res.body}'); // 디버그 프린트 (그래프 데이터)
@@ -192,7 +200,8 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
     final decoded = jsonDecode(res.body);
     if (decoded is! Map<String, dynamic>) throw Exception('환자정보 조회 응답 형식 오류');
-    if (decoded['code'] != 1) throw Exception((decoded['message'] ?? '환자정보 조회 실패').toString());
+    if (decoded['code'] != 1)
+      throw Exception((decoded['message'] ?? '환자정보 조회 실패').toString());
 
     final data = decoded['data'];
     if (data is! Map<String, dynamic>) throw Exception('환자정보 조회 data 형식 오류');
@@ -205,7 +214,8 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     final p = pathAndQuery.startsWith('/') ? pathAndQuery : '/$pathAndQuery';
 
     // base가 .../api 로 끝나고, p가 /api/... 로 시작하면 /api 중복 제거
-    if (base.toLowerCase().endsWith('/api') && p.toLowerCase().startsWith('/api/')) {
+    if (base.toLowerCase().endsWith('/api') &&
+        p.toLowerCase().startsWith('/api/')) {
       return base + p.substring(4); // '/api' 제거
     }
     return base + p;
@@ -217,7 +227,9 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     required int deviceCode,
     required int patientCode,
   }) async {
-    final url = _apiUrl('/api/measurement/basic?device_code=$deviceCode&patient_code=$patientCode');
+    final url = _apiUrl(
+      '/api/measurement/basic?device_code=$deviceCode&patient_code=$patientCode',
+    );
     final uri = Uri.parse(url);
 
     debugPrint('[MEASUREMENT] GET $uri');
@@ -254,14 +266,19 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     final rawList = data['result'];
     if (rawList is! List) throw Exception('측정값 조회 result 형식 오류');
 
-    final list = rawList.whereType<Map<String, dynamic>>().map(MeasurementBasicDto.fromJson).toList();
+    final list = rawList
+        .whereType<Map<String, dynamic>>()
+        .map(MeasurementBasicDto.fromJson)
+        .toList();
     list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     return list;
   }
 
   /// ✅ (추가) GET /api/patient/warning?patient_code=1
   Future<int?> _fetchPatientWarningState(int patientCode) async {
-    final uri = Uri.parse('$_front_url/api/patient/warning?patient_code=$patientCode');
+    final uri = Uri.parse(
+      '$_front_url/api/patient/warning?patient_code=$patientCode',
+    );
     final res = await http.get(uri, headers: await _headers());
 
     debugPrint('[WARNING] status=${res.statusCode} body=${res.body}');
@@ -281,7 +298,9 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
   /// DELETE /api/patient/profile/delete/{patient_code}
   Future<void> _deletePatient(int patientCode) async {
-    final uri = Uri.parse('$_front_url/api/patient/profile/delete/$patientCode');
+    final uri = Uri.parse(
+      '$_front_url/api/patient/profile/delete/$patientCode',
+    );
     final res = await http.delete(uri, headers: await _headers());
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
@@ -290,7 +309,8 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
     final decoded = jsonDecode(res.body);
     if (decoded is! Map<String, dynamic>) throw Exception('환자정보 삭제 응답 형식 오류');
-    if (decoded['code'] != 1) throw Exception((decoded['message'] ?? '환자정보 삭제 실패').toString());
+    if (decoded['code'] != 1)
+      throw Exception((decoded['message'] ?? '환자정보 삭제 실패').toString());
   }
 
   // =========================
@@ -364,7 +384,8 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     Duration step = const Duration(minutes: 10),
     int maxSource = 200,
   }) {
-    final sorted = [..._measurements]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final sorted = [..._measurements]
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
     // ✅ 더미 제거: 데이터 없으면 "빈 그래프"
     if (sorted.isEmpty) {
@@ -381,7 +402,9 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     }
 
     // ✅ 최신 쪽 위주(과도한 데이터 방지) - 기본 200, 전체화면은 더 크게 줄 수 있음
-    final src = sorted.length > maxSource ? sorted.sublist(sorted.length - maxSource) : sorted;
+    final src = sorted.length > maxSource
+        ? sorted.sublist(sorted.length - maxSource)
+        : sorted;
 
     final stepMs = step.inMilliseconds;
 
@@ -516,7 +539,8 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
       setState(() {
         _connectedDevice = device;
-        _connectionStatus = '연결됨 (${device.name.isEmpty ? 'Unknown' : device.name})';
+        _connectionStatus =
+            '연결됨 (${device.name.isEmpty ? 'Unknown' : device.name})';
       });
 
       _snack('블루투스 연결 성공');
@@ -528,7 +552,10 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     }
   }
 
-  Future<bool> _setupCharacteristics(BluetoothDevice device, List<BluetoothService> services) async {
+  Future<bool> _setupCharacteristics(
+    BluetoothDevice device,
+    List<BluetoothService> services,
+  ) async {
     try {
       BluetoothCharacteristic? writeChar;
       BluetoothCharacteristic? notifyChar;
@@ -614,14 +641,18 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
             {"sensor": 3, "value": p.weights[2]},
             {"sensor": 4, "value": p.weights[3]},
           ],
-        }
-      ]
+        },
+      ],
     };
 
     debugPrint('[MEASUREMENT][POST] $uri');
     debugPrint('[MEASUREMENT][POST BODY] ${jsonEncode(body)}');
 
-    final res = await http.post(uri, headers: await _headers(), body: jsonEncode(body));
+    final res = await http.post(
+      uri,
+      headers: await _headers(),
+      body: jsonEncode(body),
+    );
     debugPrint('[MEASUREMENT][POST] status=${res.statusCode} body=${res.body}');
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
@@ -630,7 +661,8 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
     final decoded = jsonDecode(res.body);
     if (decoded is! Map<String, dynamic>) throw Exception('측정값 저장 응답 형식 오류');
-    if (decoded['code'] != 1) throw Exception((decoded['message'] ?? '측정값 저장 실패').toString());
+    if (decoded['code'] != 1)
+      throw Exception((decoded['message'] ?? '측정값 저장 실패').toString());
   }
 
   void _handleReceivedData(List<int> data) {
@@ -639,7 +671,9 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
     debugPrint('=== BLE 수신 ===');
     debugPrint('bytes: $data / len=${data.length}');
-    final hex = data.map((b) => (b & 0xFF).toRadixString(16).padLeft(2, '0')).join(' ');
+    final hex = data
+        .map((b) => (b & 0xFF).toRadixString(16).padLeft(2, '0'))
+        .join(' ');
     debugPrint('hex: $hex');
 
     final pkt = _parseBlePacket(data);
@@ -670,7 +704,8 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
       if (!mounted) return;
       setState(() {
         if (state == BluetoothConnectionState.connected) {
-          _connectionStatus = '연결됨 (${device.name.isEmpty ? 'Unknown' : device.name})';
+          _connectionStatus =
+              '연결됨 (${device.name.isEmpty ? 'Unknown' : device.name})';
         } else {
           _connectionStatus = '연결 끊김';
           _connectedDevice = null;
@@ -717,25 +752,40 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
           side: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
         ),
         backgroundColor: const Color(0xFFFAFAFA),
-        title: const Text('정말 퇴원하겠습니까?', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text(
+          '정말 퇴원하겠습니까?',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
         content: Text(
           '${p.name} 환자를 퇴원 처리하면 목록에서 제거됩니다.',
-          style: const TextStyle(fontWeight: FontWeight.w900, height: 1.4, color: Color(0xFF111827)),
+          style: const TextStyle(
+            fontWeight: FontWeight.w900,
+            height: 1.4,
+            color: Color(0xFF111827),
+          ),
         ),
         actions: [
           OutlinedButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.w800)),
+            child: const Text(
+              '닫기',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('퇴원', style: TextStyle(fontWeight: FontWeight.w900)),
+            child: const Text(
+              '퇴원',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
           ),
         ],
       ),
@@ -788,7 +838,11 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     if (_loading) {
       return const Dialog(
         backgroundColor: Colors.transparent,
-        child: SizedBox(width: 520, height: 220, child: Center(child: CircularProgressIndicator())),
+        child: SizedBox(
+          width: 520,
+          height: 220,
+          child: Center(child: CircularProgressIndicator()),
+        ),
       );
     }
 
@@ -796,9 +850,21 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     final latest = _latestMeasurement;
 
     // ✅ 상단 텍스트(체온/병실온도/습도)도 API 최신값으로
-    final bodyTempText = _vitalValueOrDash(value: latest?.bodyTemperature, unit: '°C', frac: 1);
-    final roomTempText = _vitalValueOrDash(value: latest?.temperature, unit: ' °C', frac: 1);
-    final humidText = _vitalValueOrDash(value: latest?.humidity, unit: '%', frac: 0);
+    final bodyTempText = _vitalValueOrDash(
+      value: latest?.bodyTemperature,
+      unit: '°C',
+      frac: 1,
+    );
+    final roomTempText = _vitalValueOrDash(
+      value: latest?.temperature,
+      unit: ' °C',
+      frac: 1,
+    );
+    final humidText = _vitalValueOrDash(
+      value: latest?.humidity,
+      unit: '%',
+      frac: 0,
+    );
 
     // ✅ (변경) 움직임 라벨: warning API 기준
     final ws = _warningState;
@@ -893,11 +959,15 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
       child: Container(
         width: 1120,
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: const Color(0xFFE5E7EB)),
           boxShadow: const [
-            BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, 8)),
+            BoxShadow(
+              color: Color(0x14000000),
+              blurRadius: 16,
+              offset: Offset(0, 8),
+            ),
           ],
         ),
         child: Column(
@@ -908,28 +978,45 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
               padding: const EdgeInsets.fromLTRB(22, 16, 18, 12),
               child: Row(
                 children: [
-                  Text('${p.name} 환자 상세', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                  Text(
+                    '${p.name} 환자 상세',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                   const SizedBox(width: 10),
 
                   // ✅ BLE 상태 칩 (추가)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: _connectedDevice != null ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                      color: _connectedDevice != null
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFEF4444),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _connectedDevice != null ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                          _connectedDevice != null
+                              ? Icons.bluetooth_connected
+                              : Icons.bluetooth_disabled,
                           size: 16,
                           color: Colors.white,
                         ),
                         const SizedBox(width: 6),
                         Text(
                           _connectedDevice != null ? '연결됨' : '연결 안됨',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -939,22 +1026,38 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                   // ✅ BLE 버튼 (추가)
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _connectedDevice == null ? const Color(0xFF2563EB) : const Color(0xFFEF4444),
+                      backgroundColor: _connectedDevice == null
+                          ? const Color(0xFF2563EB)
+                          : const Color(0xFFEF4444),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                     ),
                     onPressed: _isConnectingBle ? null : _onBleButtonPressed,
                     icon: _isConnectingBle
                         ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                        : Icon(_connectedDevice == null ? Icons.bluetooth : Icons.bluetooth_disabled),
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Icon(
+                            _connectedDevice == null
+                                ? Icons.bluetooth
+                                : Icons.bluetooth_disabled,
+                          ),
                     label: Text(
-                      _isConnectingBle ? '연결 중...' : (_connectedDevice == null ? '블루투스 연결' : '연결 해제'),
+                      _isConnectingBle
+                          ? '연결 중...'
+                          : (_connectedDevice == null ? '블루투스 연결' : '연결 해제'),
                       style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ),
@@ -965,12 +1068,23 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFEF4444),
-                      side: const BorderSide(color: Color(0xFFEF4444), width: 1.4),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      side: const BorderSide(
+                        color: Color(0xFFEF4444),
+                        width: 1.4,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                     ),
                     onPressed: _deleting ? null : _onDischarge,
-                    child: const Text('퇴원', style: TextStyle(fontWeight: FontWeight.w900)),
+                    child: const Text(
+                      '퇴원',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
                   ),
 
                   const Spacer(),
@@ -980,145 +1094,179 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                       backgroundColor: const Color(0xFF22C55E),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                     ),
                     onPressed: _onEdit,
-                    child: const Text('수정', style: TextStyle(fontWeight: FontWeight.w900)),
+                    child: const Text(
+                      '수정',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF374151),
                       side: const BorderSide(color: Color(0xFFE5E7EB)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
                     ),
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.w900)),
+                    child: const Text(
+                      '닫기',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
                   ),
                 ],
               ),
             ),
             const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
-            // 내용
+            // 정보 내용
             Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 상단 2개 카드(기본/진료)
-                    Row(
-                      children: [
-                        Expanded(child: _InfoCardBasic(p: p)),
-                        const SizedBox(width: 18),
-                        Expanded(child: _InfoCardMedical(p: p)),
-                      ],
-                    ),
+              child: Container(
+                color: const Color(0xFFF3F4F6),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 상단 2개 카드(기본/진료)
+                      Row(
+                        children: [
+                          Expanded(child: _InfoCardBasic(p: p)),
+                          const SizedBox(width: 18),
+                          Expanded(child: _InfoCardMedical(p: p)),
+                        ],
+                      ),
 
-                    // ✅ BLE 연결 상태 텍스트(기능 영향 없는 정보 표시만 추가)
-                    const SizedBox(height: 12),
-                    Text(
-                      '블루투스: $_connectionStatus${_latestBleData.isNotEmpty ? ' · 최신데이터 ${_latestBleData.length}B' : ''}',
-                      style: const TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w800),
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    const Text('실시간 바이탈 사인', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 14),
-
-                    // 바이탈 카드 4개(기존 그대로)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _VitalMiniCard(
-                            title: '체온',
-                            value: bodyTempText,
-                            icon: Icons.thermostat_outlined,
-                            iconColor: const Color(0xFF2563EB),
-                          ),
+                      // BLE 연결 상태 텍스트
+                      const SizedBox(height: 12),
+                      Text(
+                        '블루투스: $_connectionStatus${_latestBleData.isNotEmpty ? ' · 최신데이터 ${_latestBleData.length}B' : ''}',
+                        style: const TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w800,
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _VitalMiniCard(
-                            title: '병실온도',
-                            value: roomTempText,
-                            icon: Icons.thermostat_outlined,
-                            iconColor: const Color(0xFFDC2626),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _VitalMiniCard(
-                            title: '습도',
-                            value: humidText,
-                            icon: Icons.water_drop_outlined,
-                            iconColor: const Color(0xFF0EA5E9),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _VitalMiniCard(
-                            title: '움직임',
-                            value: movementText,
-                            valueColor: movementColor, // ✅ (추가) 0/1/2 색상
-                            icon: Icons.accessibility_new_outlined,
-                            iconColor: const Color(0xFF7C3AED),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
 
-                    const SizedBox(height: 18),
+                      const SizedBox(height: 22),
 
-                    // ✅ 그래프 영역(원본 그대로)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _GraphCard(
-                            title: '체온 그래프',
-                            onOpenFull: () => _showChartFullScreen(
-                              context,
+                      const Text(
+                        '실시간 바이탈 사인',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 바이탈 카드 4개
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _VitalMiniCard(
+                              title: '체온',
+                              value: bodyTempText,
+                              icon: Icons.thermostat_outlined,
+                              iconColor: const Color(0xFF2563EB),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _VitalMiniCard(
+                              title: '병실온도',
+                              value: roomTempText,
+                              icon: Icons.thermostat_outlined,
+                              iconColor: const Color(0xFFDC2626),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _VitalMiniCard(
+                              title: '습도',
+                              value: humidText,
+                              icon: Icons.water_drop_outlined,
+                              iconColor: const Color(0xFF0EA5E9),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _VitalMiniCard(
+                              title: '움직임',
+                              value: movementText,
+                              valueColor: movementColor,
+                              icon: Icons.accessibility_new_outlined,
+                              iconColor: const Color(0xFF7C3AED),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // 그래프 영역
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _GraphCard(
                               title: '체온 그래프',
-                              series: bodyTempSeriesFull, // ✅ 전체화면은 더 긴 시리즈
+                              onOpenFull: () => _showChartFullScreen(
+                                context,
+                                title: '체온 그래프',
+                                series: bodyTempSeriesFull,
+                              ),
+                              child: _StaticLineChart(
+                                series: bodyTempSeries,
+                              ),
                             ),
-                            child: _StaticLineChart(series: bodyTempSeries),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _GraphCard(
-                            title: '병실온도 그래프',
-                            onOpenFull: () => _showChartFullScreen(
-                              context,
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _GraphCard(
                               title: '병실온도 그래프',
-                              series: roomTempSeriesFull,
+                              onOpenFull: () => _showChartFullScreen(
+                                context,
+                                title: '병실온도 그래프',
+                                series: roomTempSeriesFull,
+                              ),
+                              child: _StaticLineChart(
+                                series: roomTempSeries,
+                              ),
                             ),
-                            child: _StaticLineChart(series: roomTempSeries),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _GraphCard(
-                            title: '습도 그래프',
-                            onOpenFull: () => _showChartFullScreen(
-                              context,
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _GraphCard(
                               title: '습도 그래프',
-                              series: humiditySeriesFull,
+                              onOpenFull: () => _showChartFullScreen(
+                                context,
+                                title: '습도 그래프',
+                                series: humiditySeriesFull,
+                              ),
+                              child: _StaticLineChart(
+                                series: humiditySeries,
+                              ),
                             ),
-                            child: _StaticLineChart(series: humiditySeries),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1130,6 +1278,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
   @override
   void dispose() {
+    _remarkController.dispose();
     _blePostDebounce?.cancel();
     _connSub?.cancel();
     _connectedDevice?.disconnect();
@@ -1313,7 +1462,11 @@ class _InfoCardMedical extends StatelessWidget {
         _KV('진단명', p.diagnosis.isEmpty ? '-' : p.diagnosis),
         _KV('주치의', p.physician.isEmpty ? '-' : p.physician),
         _KV('알레르기', p.allergy.isEmpty ? '-' : p.allergy),
-        _KV('특이사항', p.note.isEmpty ? '-' : p.note, valueColor: p.note.isEmpty ? null : const Color(0xFFDC2626)),
+        _KV(
+          '특이사항',
+          p.note.isEmpty ? '-' : p.note,
+          valueColor: p.note.isEmpty ? null : const Color(0xFFDC2626),
+        ),
       ],
     );
   }
@@ -1348,13 +1501,20 @@ class _BigCard extends StatelessWidget {
             children: [
               Icon(titleIcon, color: titleIconColor),
               const SizedBox(width: 12),
-              Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 18),
           for (int i = 0; i < rows.length; i++) ...[
             _KVRow(rows[i]),
-            if (i != rows.length - 1) const Divider(height: 18, color: Color(0xFFE5E7EB)),
+            if (i != rows.length - 1)
+              const Divider(height: 18, color: Color(0xFFE5E7EB)),
           ],
         ],
       ),
@@ -1380,7 +1540,11 @@ class _KVRow extends StatelessWidget {
         Expanded(
           child: Text(
             kv.k,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF374151)),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF374151),
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -1388,7 +1552,11 @@ class _KVRow extends StatelessWidget {
           child: Text(
             kv.v,
             textAlign: TextAlign.right,
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: kv.valueColor ?? const Color(0xFF111827)),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: kv.valueColor ?? const Color(0xFF111827),
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -1431,7 +1599,13 @@ class _VitalMiniCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Text(
                   value,
@@ -1478,11 +1652,23 @@ class _GraphCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
                 IconButton(
                   tooltip: '확대',
                   onPressed: onOpenFull,
-                  icon: const Icon(Icons.open_in_full, size: 18, color: Color(0xFF6B7280)),
+                  icon: const Icon(
+                    Icons.open_in_full,
+                    size: 18,
+                    color: Color(0xFF6B7280),
+                  ),
                 ),
               ],
             ),
@@ -1543,7 +1729,11 @@ class _StaticLineChart extends StatelessWidget {
           border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
         child: CustomPaint(
-          painter: _LineChartPainter(series: series, selectedIndex: null, showTooltip: false),
+          painter: _LineChartPainter(
+            series: series,
+            selectedIndex: null,
+            showTooltip: false,
+          ),
           child: const SizedBox.expand(),
         ),
       ),
@@ -1595,7 +1785,11 @@ class _InteractiveLineChartState extends State<_InteractiveLineChart> {
                 border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
               child: CustomPaint(
-                painter: _LineChartPainter(series: widget.series, selectedIndex: selected, showTooltip: true),
+                painter: _LineChartPainter(
+                  series: widget.series,
+                  selectedIndex: selected,
+                  showTooltip: true,
+                ),
                 child: const SizedBox.expand(),
               ),
             ),
@@ -1625,7 +1819,10 @@ class _LineChartPainter extends CustomPainter {
     const axisText = Color(0xFF9CA3AF);
     const tooltipBg = Color(0xCC111827);
 
-    final rrect = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(16));
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(16),
+    );
     canvas.drawRRect(rrect, Paint()..color = bg);
     canvas.drawRRect(
       rrect,
@@ -1665,7 +1862,11 @@ class _LineChartPainter extends CustomPainter {
       final y = plot.top + plot.height * t;
       tp.text = TextSpan(
         text: _fmtNum(yVal),
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: axisText),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: axisText,
+        ),
       );
       tp.layout(maxWidth: leftPad - 6);
       tp.paint(canvas, Offset(6, y - tp.height / 2));
@@ -1684,7 +1885,11 @@ class _LineChartPainter extends CustomPainter {
 
         tp.text = TextSpan(
           text: label,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: axisText),
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: axisText,
+          ),
         );
         tp.layout();
         tp.paint(canvas, Offset(x - tp.width / 2, plot.bottom + 6));
@@ -1697,7 +1902,10 @@ class _LineChartPainter extends CustomPainter {
       final t = i / (n - 1);
       final x = plot.left + plot.width * t;
 
-      final yn = ((v - series.yMin) / (series.yMax - series.yMin)).clamp(0.0, 1.0);
+      final yn = ((v - series.yMin) / (series.yMax - series.yMin)).clamp(
+        0.0,
+        1.0,
+      );
       final y = plot.bottom - plot.height * yn;
       return Offset(x, y);
     }
@@ -1740,7 +1948,11 @@ class _LineChartPainter extends CustomPainter {
       }
     }
 
-    if (showTooltip && selectedIndex != null && n >= 2 && selectedIndex! >= 0 && selectedIndex! < n) {
+    if (showTooltip &&
+        selectedIndex != null &&
+        n >= 2 &&
+        selectedIndex! >= 0 &&
+        selectedIndex! < n) {
       final idx = selectedIndex!;
       final p = ptToXY(idx);
       final t = series.points[idx].t;
@@ -1749,7 +1961,11 @@ class _LineChartPainter extends CustomPainter {
       final line1 = _fmtDateTime(t);
       final line2 = '${series.title}:${_fmtNum(v)}${series.unit}';
 
-      final textStyle = const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800);
+      final textStyle = const TextStyle(
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+      );
       final tp1 = TextPainter(textDirection: TextDirection.ltr)
         ..text = TextSpan(text: line1, style: textStyle)
         ..layout();
@@ -1768,7 +1984,10 @@ class _LineChartPainter extends CustomPainter {
       bx = bx.clamp(8.0, size.width - w - 8);
       by = by.clamp(8.0, size.height - h - 8);
 
-      final rect = RRect.fromRectAndRadius(Rect.fromLTWH(bx, by, w, h), const Radius.circular(10));
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(bx, by, w, h),
+        const Radius.circular(10),
+      );
       canvas.drawRRect(rect, Paint()..color = tooltipBg);
 
       tp1.paint(canvas, Offset(bx + 9, by + 7));
@@ -1784,7 +2003,11 @@ class _LineChartPainter extends CustomPainter {
   }
 }
 
-void _showChartFullScreen(BuildContext context, {required String title, required _ChartSeries series}) {
+void _showChartFullScreen(
+  BuildContext context, {
+  required String title,
+  required _ChartSeries series,
+}) {
   showDialog(
     context: context,
     barrierColor: const Color(0x99000000),
@@ -1803,7 +2026,11 @@ void _showChartFullScreen(BuildContext context, {required String title, required
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: const Color(0xFFE5E7EB)),
             boxShadow: const [
-              BoxShadow(color: Color(0x1A000000), blurRadius: 18, offset: Offset(0, 10)),
+              BoxShadow(
+                color: Color(0x1A000000),
+                blurRadius: 18,
+                offset: Offset(0, 10),
+              ),
             ],
           ),
           child: Column(
@@ -1811,17 +2038,31 @@ void _showChartFullScreen(BuildContext context, {required String title, required
             children: [
               Row(
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                   const Spacer(),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF374151),
                       side: const BorderSide(color: Color(0xFFE5E7EB)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                     ),
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.w900)),
+                    child: const Text(
+                      '닫기',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
                   ),
                 ],
               ),
@@ -1846,7 +2087,10 @@ void _showChartFullScreen(BuildContext context, {required String title, required
               const SizedBox(height: 10),
               const Text(
                 '점을 터치 하면 상세 정보가 표시됩니다.',
-                style: TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
           ),
@@ -1967,7 +2211,10 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: _cBorder),
                     ),
-                    child: const Icon(Icons.bluetooth_searching, color: _cGreen),
+                    child: const Icon(
+                      Icons.bluetooth_searching,
+                      color: _cGreen,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
@@ -2004,7 +2251,10 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                 children: [
                   // 상태 배너
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(14),
@@ -2029,7 +2279,9 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            _isScanning ? '검색 중입니다...  (${_devices.length}개 발견)' : '검색 완료  (${_devices.length}개)',
+                            _isScanning
+                                ? '검색 중입니다...  (${_devices.length}개 발견)'
+                                : '검색 완료  (${_devices.length}개)',
                             style: const TextStyle(
                               color: _cText,
                               fontWeight: FontWeight.w800,
@@ -2038,7 +2290,10 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                         ),
                         if (!_isScanning)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: _cGreen,
                               borderRadius: BorderRadius.circular(999),
@@ -2068,118 +2323,136 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                     ),
                     child: _devices.isEmpty
                         ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _isScanning ? Icons.bluetooth_searching : Icons.bluetooth_disabled,
-                              size: 44,
-                              color: const Color(0xFF9CA3AF),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              _isScanning ? '기기를 검색하고 있습니다...' : '발견된 기기가 없습니다',
-                              style: const TextStyle(
-                                color: _cSub,
-                                fontWeight: FontWeight.w700,
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    _isScanning
+                                        ? Icons.bluetooth_searching
+                                        : Icons.bluetooth_disabled,
+                                    size: 44,
+                                    color: const Color(0xFF9CA3AF),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    _isScanning
+                                        ? '기기를 검색하고 있습니다...'
+                                        : '발견된 기기가 없습니다',
+                                    style: const TextStyle(
+                                      color: _cSub,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    '기기 전원이 켜져있는지, 블루투스 기기를 확인해 주세요.',
+                                    style: TextStyle(
+                                      color: _cSub,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              '기기 전원이 켜져있는지, 블루투스 기기를 확인해 주세요.',
-                              style: TextStyle(
-                                color: _cSub,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
+                          )
                         : ListView.separated(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _devices.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final device = _devices[index];
-                        final name = device.name.isEmpty ? '알 수 없는 기기 ${index + 1}' : device.name;
-                        final mac = device.id.id;
+                            padding: const EdgeInsets.all(12),
+                            itemCount: _devices.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final device = _devices[index];
+                              final name = device.name.isEmpty
+                                  ? '알 수 없는 기기 ${index + 1}'
+                                  : device.name;
+                              final mac = device.id.id;
 
-                        return InkWell(
-                          onTap: () => Navigator.of(context).pop(device),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFFFFF),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: _cBorder),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
+                              return InkWell(
+                                onTap: () => Navigator.of(context).pop(device),
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: _cGreen.withOpacity(0.10),
-                                    borderRadius: BorderRadius.circular(14),
+                                    color: const Color(0xFFFFFFFF),
+                                    borderRadius: BorderRadius.circular(16),
                                     border: Border.all(color: _cBorder),
                                   ),
-                                  child: const Icon(Icons.bluetooth, color: _cGreen),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                  child: Row(
                                     children: [
-                                      Text(
-                                        name,
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w900,
-                                          color: _cText,
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: _cGreen.withOpacity(0.10),
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          border: Border.all(color: _cBorder),
                                         ),
-                                        overflow: TextOverflow.ellipsis,
+                                        child: const Icon(
+                                          Icons.bluetooth,
+                                          color: _cGreen,
+                                        ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'MAC  $mac',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: _cSub,
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              name,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w900,
+                                                color: _cText,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'MAC  $mac',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: _cSub,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
                                         ),
-                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _cGreen,
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          '선택',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 12,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: _cGreen,
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: const Text(
-                                    '선택',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
-                        );
-                      },
-                    ),
                   ),
                 ],
               ),
@@ -2197,11 +2470,19 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _cText,
                       side: const BorderSide(color: _cBorder),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                     ),
                     icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('다시 검색', style: TextStyle(fontWeight: FontWeight.w900)),
+                    label: const Text(
+                      '다시 검색',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
                   ),
                   const Spacer(),
                   OutlinedButton(
@@ -2209,10 +2490,18 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF374151),
                       side: const BorderSide(color: _cBorder),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 12,
+                      ),
                     ),
-                    child: const Text('취소', style: TextStyle(fontWeight: FontWeight.w900)),
+                    child: const Text(
+                      '취소',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
                   ),
                 ],
               ),
@@ -2223,3 +2512,5 @@ class _ScanningDialogState extends State<_ScanningDialog> {
     );
   }
 }
+
+// (욕창단계입력 관련 클래스는 patient_care_dialog.dart로 이동됨)

@@ -21,13 +21,23 @@ class BedPatientItem {
 class BedTile extends StatelessWidget {
   final int bedNo;
   final BedPatientItem? patient;
+
+  /// 빈 침대 탭
   final VoidCallback? onTap;
+
+  /// 환자 정보 버튼 탭
+  final VoidCallback? onInfoTap;
+
+  /// 케어입력 버튼 탭
+  final VoidCallback? onCareTap;
 
   const BedTile({
     super.key,
     required this.bedNo,
     required this.patient,
-    required this.onTap,
+    this.onTap,
+    this.onInfoTap,
+    this.onCareTap,
   });
 
   @override
@@ -66,7 +76,7 @@ class BedTile extends StatelessWidget {
         );
 
         return InkWell(
-          onTap: onTap,
+          onTap: has ? null : onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: EdgeInsets.all(pad),
@@ -146,6 +156,61 @@ class BedTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: ageStyle,
                         textAlign: TextAlign.center,
+                      ),
+
+                      SizedBox(height: isCompact ? 6 : 10),
+
+                      // ✅ 정보 / 케어입력 버튼
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: isCompact ? 28 : 32,
+                              child: OutlinedButton(
+                                onPressed: onInfoTap,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF2563EB),
+                                  side: const BorderSide(color: Color(0xFF2563EB)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                ),
+                                child: Text(
+                                  '정보',
+                                  style: TextStyle(
+                                    fontSize: isCompact ? 10 : 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: SizedBox(
+                              height: isCompact ? 28 : 32,
+                              child: OutlinedButton(
+                                onPressed: onCareTap,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF7F9BD8),
+                                  side: const BorderSide(color: Color(0xFF7F9BD8)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                ),
+                                child: Text(
+                                  '케어',
+                                  style: TextStyle(
+                                    fontSize: isCompact ? 10 : 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ] else ...[
                       SizedBox(height: isCompact ? 10 : 18),

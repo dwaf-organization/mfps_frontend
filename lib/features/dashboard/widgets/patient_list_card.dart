@@ -61,21 +61,13 @@ class PatientListCard extends StatelessWidget {
     required this.onTap,
   });
 
-  Color _warnColor(int v) {
-    // 0=안전(초록), 1=경고(주황), 2=위험(빨강)
-    if (v == 2) return const Color(0xFFEF4444);
-    if (v == 1) return const Color(0xFFF59E0B);
-    return const Color(0xFF22C55E);
-  }
-
   @override
   Widget build(BuildContext context) {
     final s = patient.status;
     final c = statusColor(s);
 
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -107,19 +99,18 @@ class PatientListCard extends StatelessWidget {
                     '병실 ${patient.patientRoom} · ${patient.patientBed}',
                     style: const TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: c.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      statusLabel(s),
-                      style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 12),
-                    ),
-                  ),
                 ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: c.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                statusLabel(s),
+                style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 12),
               ),
             ),
           ],

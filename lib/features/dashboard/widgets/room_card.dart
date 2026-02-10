@@ -10,6 +10,7 @@ import 'bed_tile.dart';
 
 import 'dialogs/patient_add_dialog.dart';
 import 'dialogs/patient_detail_dialog.dart';
+import 'dialogs/patient_care_dialog.dart';
 
 /// 명세 예시:
 /// GET /api/hospital/structure?hospital_st_code=<floorStCode>
@@ -342,7 +343,7 @@ class _RoomCardState extends State<RoomCard> {
                 crossAxisCount: 4,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 14,
-                childAspectRatio: 1.05,
+                childAspectRatio: 0.78,
               ),
               itemBuilder: (context, i) {
                 final bed = beds[i];
@@ -352,42 +353,53 @@ class _RoomCardState extends State<RoomCard> {
                 return BedTile(
                   bedNo: bedNo,
                   patient: patient,
+                  // ✅ 빈 침대 탭 → 환자 추가
                   onTap: () async {
-                    if (patient != null) {
-                      if (widget.onPatientTap != null) {
-                        await widget.onPatientTap!(patient);
-                      } else {
-                        await showDialog(
-                          context: context,
-                          builder: (ctx) => PatientDetailDialog(
-                            patientCode: patient.patientCode,
-                            roomLabel: room.categoryName,
-                            bedLabel: bed.categoryName,
-                            onRefresh: null,
-                          ),
-                        );
-                      }
-
-                      if (widget.onRefresh != null) {
-                        await widget.onRefresh!();
-                      }
+                    if (widget.onEmptyBedTap != null) {
+                      await widget.onEmptyBedTap!(room, bed);
+                      if (widget.onRefresh != null) await widget.onRefresh!();
                     } else {
-                      if (widget.onEmptyBedTap != null) {
-                        await widget.onEmptyBedTap!(room, bed);
-                        if (widget.onRefresh != null) await widget.onRefresh!();
-                      } else {
-                        final ok = await showDialog<bool>(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (ctx) => PatientAddDialog(),
-                        );
-
-                        if (ok == true && widget.onRefresh != null) {
-                          await widget.onRefresh!();
-                        }
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => PatientAddDialog(),
+                      );
+                      if (ok == true && widget.onRefresh != null) {
+                        await widget.onRefresh!();
                       }
                     }
                   },
+                  // ✅ 정보 버튼 → PatientDetailDialog
+                  onInfoTap: patient == null
+                      ? null
+                      : () async {
+                          await showDialog(
+                            context: context,
+                            builder: (ctx) => PatientDetailDialog(
+                              patientCode: patient.patientCode,
+                              roomLabel: room.categoryName,
+                              bedLabel: bed.categoryName,
+                              onRefresh: null,
+                            ),
+                          );
+                          if (widget.onRefresh != null) {
+                            await widget.onRefresh!();
+                          }
+                        },
+                  // ✅ 케어 버튼 → PatientCareDialog
+                  onCareTap: patient == null
+                      ? null
+                      : () async {
+                          await showDialog(
+                            context: context,
+                            builder: (ctx) => PatientCareDialog(
+                              patientCode: patient.patientCode,
+                              patientName: patient.patientName,
+                              roomLabel: room.categoryName,
+                              bedLabel: bed.categoryName,
+                            ),
+                          );
+                        },
                 );
               },
             ),
