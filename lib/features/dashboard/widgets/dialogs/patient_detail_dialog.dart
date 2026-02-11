@@ -988,46 +988,46 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                   const SizedBox(width: 10),
 
                   // ✅ BLE 상태 칩 (추가)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _connectedDevice != null
-                          ? const Color(0xFF10B981)
-                          : const Color(0xFFEF4444),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _connectedDevice != null
-                              ? Icons.bluetooth_connected
-                              : Icons.bluetooth_disabled,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _connectedDevice != null ? '연결됨' : '연결 안됨',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Container(
+                  //   padding: const EdgeInsets.symmetric(
+                  //     horizontal: 10,
+                  //     vertical: 6,
+                  //   ),
+                  //   decoration: BoxDecoration(
+                  //     color: _connectedDevice != null
+                  //         ? const Color(0xFF10B981)
+                  //         : const Color(0xFFEF4444),
+                  //     borderRadius: BorderRadius.circular(999),
+                  //   ),
+                  // child: Row(
+                  //   mainAxisSize: MainAxisSize.min,
+                  //   children: [
+                  //     Icon(
+                  //       _connectedDevice != null
+                  //           ? Icons.bluetooth_connected
+                  //           : Icons.bluetooth_disabled,
+                  //       size: 16,
+                  //       color: Colors.white,
+                  //     ),
+                  //     const SizedBox(width: 6),
+                  //     Text(
+                  //       _connectedDevice != null ? '연결됨' : '연결 안됨',
+                  //       style: const TextStyle(
+                  //         color: Colors.white,
+                  //         fontWeight: FontWeight.w900,
+                  //         fontSize: 12,
+                  //       ),
+                  //     ),
+                  //   ],
+                  // ),
+                  // ),
                   const SizedBox(width: 10),
 
                   // ✅ BLE 버튼 (추가)
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _connectedDevice == null
-                          ? const Color(0xFF2563EB)
+                          ? const Color.fromARGB(255, 96, 134, 218)
                           : const Color(0xFFEF4444),
                       foregroundColor: Colors.white,
                       elevation: 0,
@@ -1036,7 +1036,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                       ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
-                        vertical: 12,
+                        vertical: 8,
                       ),
                     ),
                     onPressed: _isConnectingBle ? null : _onBleButtonPressed,
@@ -1051,13 +1051,14 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                           )
                         : Icon(
                             _connectedDevice == null
-                                ? Icons.bluetooth
+                                // ? Icons.bluetooth
+                                ? Icons.bluetooth_disabled
                                 : Icons.bluetooth_disabled,
                           ),
                     label: Text(
                       _isConnectingBle
                           ? '연결 중...'
-                          : (_connectedDevice == null ? '블루투스 연결' : '연결 해제'),
+                          : (_connectedDevice == null ? '연결' : '연결 해제'),
                       style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ),
@@ -1226,9 +1227,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                                 title: '체온 그래프',
                                 series: bodyTempSeriesFull,
                               ),
-                              child: _StaticLineChart(
-                                series: bodyTempSeries,
-                              ),
+                              child: _StaticLineChart(series: bodyTempSeries),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -1240,9 +1239,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                                 title: '병실온도 그래프',
                                 series: roomTempSeriesFull,
                               ),
-                              child: _StaticLineChart(
-                                series: roomTempSeries,
-                              ),
+                              child: _StaticLineChart(series: roomTempSeries),
                             ),
                           ),
                         ],
@@ -1258,9 +1255,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                                 title: '습도 그래프',
                                 series: humiditySeriesFull,
                               ),
-                              child: _StaticLineChart(
-                                series: humiditySeries,
-                              ),
+                              child: _StaticLineChart(series: humiditySeries),
                             ),
                           ),
                         ],

@@ -46,12 +46,14 @@ class BedTile extends StatelessWidget {
 
     final RiskStatus? status = has ? patient!.status : null;
     final Color border = has ? statusColor(status!) : const Color(0xFFD1D5DB);
-    final Color bg = has ? statusColor(status!).withOpacity(0.06) : Colors.white;
+    final Color bg = has
+        ? statusColor(status!).withOpacity(0.06)
+        : Colors.white;
     final bool showDangerBadge = has && status == RiskStatus.danger;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxHeight < 170;
+        final isCompact = constraints.maxHeight < 100;
 
         final pad = isCompact ? 8.0 : 12.0;
         final iconSize = isCompact ? 28.0 : 34.0;
@@ -93,7 +95,7 @@ class BedTile extends StatelessWidget {
                     top: 0,
                     child: Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: isCompact ? 8 : 10,
+                        horizontal: isCompact ? 4 : 4,
                         vertical: isCompact ? 4 : 6,
                       ),
                       decoration: BoxDecoration(
@@ -103,8 +105,11 @@ class BedTile extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.warning_amber_rounded,
-                              size: isCompact ? 12 : 14, color: Colors.white),
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            size: isCompact ? 12 : 14,
+                            color: Colors.white,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             '위험',
@@ -122,8 +127,12 @@ class BedTile extends StatelessWidget {
 
                 Column(
                   children: [
-                    const Spacer(),
-                    Icon(Icons.bed_outlined, size: iconSize, color: const Color(0xFF6B7280)),
+                    // const Spacer(),
+                    Icon(
+                      Icons.bed_outlined,
+                      size: iconSize,
+                      color: const Color(0xFF6B7280),
+                    ),
                     SizedBox(height: isCompact ? 6 : 8),
 
                     FittedBox(
@@ -134,7 +143,11 @@ class BedTile extends StatelessWidget {
                     SizedBox(height: isCompact ? 6 : 8),
 
                     if (has) ...[
-                      Icon(Icons.person_outline, size: isCompact ? 14 : 16, color: const Color(0xFF6B7280)),
+                      Icon(
+                        Icons.person_outline,
+                        size: isCompact ? 14 : 16,
+                        color: const Color(0xFF6B7280),
+                      ),
                       SizedBox(height: isCompact ? 4 : 6),
 
                       SizedBox(
@@ -170,7 +183,9 @@ class BedTile extends StatelessWidget {
                                 onPressed: onInfoTap,
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: const Color(0xFF2563EB),
-                                  side: const BorderSide(color: Color(0xFF2563EB)),
+                                  side: const BorderSide(
+                                    color: Color(0xFF2563EB),
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -194,7 +209,9 @@ class BedTile extends StatelessWidget {
                                 onPressed: onCareTap,
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: const Color(0xFF7F9BD8),
-                                  side: const BorderSide(color: Color(0xFF7F9BD8)),
+                                  side: const BorderSide(
+                                    color: Color(0xFF7F9BD8),
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -218,12 +235,15 @@ class BedTile extends StatelessWidget {
                         '비어있음',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Color(0xFF9CA3AF), fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          color: Color(0xFF9CA3AF),
+                          fontWeight: FontWeight.w800,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ],
 
-                    const Spacer(),
+                    // const Spacer(),
                   ],
                 ),
               ],

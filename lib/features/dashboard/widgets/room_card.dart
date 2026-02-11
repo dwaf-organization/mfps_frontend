@@ -38,14 +38,18 @@ class FloorStructureRoom {
     final bedsList = (bedsAny is List) ? bedsAny : const [];
 
     return FloorStructureRoom(
-      hospitalStCode: int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? -1,
+      hospitalStCode:
+          int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? -1,
       categoryName: (j['category_name']?.toString() ?? '').trim(),
       sortOrder: int.tryParse(j['sort_order']?.toString() ?? '') ?? 0,
-      beds: bedsList
-          .whereType<Map>()
-          .map((e) => FloorStructureBed.fromJson(Map<String, dynamic>.from(e)))
-          .toList()
-        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
+      beds:
+          bedsList
+              .whereType<Map>()
+              .map(
+                (e) => FloorStructureBed.fromJson(Map<String, dynamic>.from(e)),
+              )
+              .toList()
+            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
     );
   }
 
@@ -70,17 +74,21 @@ class FloorStructureBed {
     final pMap = (pAny is Map) ? Map<String, dynamic>.from(pAny) : null;
 
     return FloorStructureBed(
-      hospitalStCode: int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? -1,
+      hospitalStCode:
+          int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? -1,
       categoryName: (j['category_name']?.toString() ?? '').trim(),
       sortOrder: int.tryParse(j['sort_order']?.toString() ?? '') ?? 0,
       patient: (pMap == null)
           ? null
           : BedPatientItem(
-        patientCode: int.tryParse(pMap['patient_code']?.toString() ?? '') ?? -1,
-        patientName: (pMap['patient_name']?.toString() ?? '').trim(),
-        patientAge: int.tryParse(pMap['patient_age']?.toString() ?? '') ?? 0,
-        patientWarning: int.tryParse(pMap['patient_warning']?.toString() ?? '') ?? 0,
-      ),
+              patientCode:
+                  int.tryParse(pMap['patient_code']?.toString() ?? '') ?? -1,
+              patientName: (pMap['patient_name']?.toString() ?? '').trim(),
+              patientAge:
+                  int.tryParse(pMap['patient_age']?.toString() ?? '') ?? 0,
+              patientWarning:
+                  int.tryParse(pMap['patient_warning']?.toString() ?? '') ?? 0,
+            ),
     );
   }
 
@@ -101,7 +109,8 @@ class RoomsSection extends StatefulWidget {
   final int? floorStCode; // 선택된 층 hospital_st_code
 
   /// 필요하면 연결(없으면 null)
-  final Future<void> Function(FloorStructureRoom room, FloorStructureBed bed)? onEmptyBedTap;
+  final Future<void> Function(FloorStructureRoom room, FloorStructureBed bed)?
+  onEmptyBedTap;
   final Future<void> Function(BedPatientItem patient)? onPatientTap;
 
   const RoomsSection({
@@ -170,9 +179,14 @@ class _RoomsSectionState extends State<RoomsSection> {
 
     try {
       final base = Urlconfig.serverUrl;
-      final uri = Uri.parse('$base/api/hospital/structure?hospital_st_code=$st');
+      final uri = Uri.parse(
+        '$base/api/hospital/structure?hospital_st_code=$st',
+      );
 
-      final res = await http.get(uri, headers: {'Content-Type': 'application/json'});
+      final res = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
       final decoded = jsonDecode(res.body);
 
       if (!mounted) return;
@@ -192,11 +206,15 @@ class _RoomsSectionState extends State<RoomsSection> {
       final roomsAny = (data is Map) ? data['rooms'] : null;
       final list = (roomsAny is List) ? roomsAny : const [];
 
-      final parsed = list
-          .whereType<Map>()
-          .map((e) => FloorStructureRoom.fromJson(Map<String, dynamic>.from(e)))
-          .toList()
-        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      final parsed =
+          list
+              .whereType<Map>()
+              .map(
+                (e) =>
+                    FloorStructureRoom.fromJson(Map<String, dynamic>.from(e)),
+              )
+              .toList()
+            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
       setState(() {
         _rooms = parsed;
@@ -226,7 +244,10 @@ class _RoomsSectionState extends State<RoomsSection> {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Text(
           _error!,
-          style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w800),
+          style: const TextStyle(
+            color: Color(0xFFEF4444),
+            fontWeight: FontWeight.w800,
+          ),
         ),
       );
     }
@@ -236,7 +257,10 @@ class _RoomsSectionState extends State<RoomsSection> {
         padding: EdgeInsets.symmetric(vertical: 12),
         child: Text(
           '호실 정보가 없습니다.',
-          style: TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w800),
+          style: TextStyle(
+            color: Color(0xFF6B7280),
+            fontWeight: FontWeight.w800,
+          ),
         ),
       );
     }
@@ -275,7 +299,8 @@ class RoomCard extends StatefulWidget {
   final FloorStructureRoom room;
 
   /// 빈 침대 눌렀을 때
-  final Future<void> Function(FloorStructureRoom room, FloorStructureBed bed)? onEmptyBedTap;
+  final Future<void> Function(FloorStructureRoom room, FloorStructureBed bed)?
+  onEmptyBedTap;
 
   /// 환자 눌렀을 때
   final Future<void> Function(BedPatientItem patient)? onPatientTap;
@@ -303,7 +328,7 @@ class _RoomCardState extends State<RoomCard> {
     final totalBeds = beds.length;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -319,18 +344,24 @@ class _RoomCardState extends State<RoomCard> {
           const SizedBox(height: 6),
           Text(
             '입원 환자: $occupied/$totalBeds',
-            style: const TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 14),
           Container(height: 2, color: const Color(0xFF111827)),
           const SizedBox(height: 14),
           if (beds.isEmpty)
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
+              padding: EdgeInsets.symmetric(vertical: 4),
               child: Center(
                 child: Text(
                   '침대 정보가 없습니다.',
-                  style: TextStyle(color: Color(0xFF9CA3AF), fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    color: Color(0xFF9CA3AF),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             )
@@ -343,7 +374,7 @@ class _RoomCardState extends State<RoomCard> {
                 crossAxisCount: 4,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 14,
-                childAspectRatio: 0.78,
+                childAspectRatio: 1.0,
               ),
               itemBuilder: (context, i) {
                 final bed = beds[i];
@@ -408,35 +439,35 @@ class _RoomCardState extends State<RoomCard> {
     );
   }
 
-  void _simpleInfoDialog(BuildContext context, BedPatientItem p) {
-    const border = Color(0xFFE5E7EB);
-    const text = Color(0xFF111827);
+  // void _simpleInfoDialog(BuildContext context, BedPatientItem p) {
+  //   const border = Color(0xFFE5E7EB);
+  //   const text = Color(0xFF111827);
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: border),
-        ),
-        title: const Text(
-          '환자 정보',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: text),
-        ),
-        content: Text(
-          '${p.patientName} (${p.patientAge}세)\npatient_code: ${p.patientCode}',
-          style: const TextStyle(fontWeight: FontWeight.w700, height: 1.4, color: text),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.w800)),
-          ),
-        ],
-      ),
-    );
-  }
+  //   showDialog(
+  //     context: context,
+  //     builder: (ctx) => AlertDialog(
+  //       backgroundColor: Colors.white,
+  //       surfaceTintColor: Colors.white,
+  //       elevation: 0,
+  //       shape: RoundedRectangleBorder(
+  //         borderRadius: BorderRadius.circular(18),
+  //         side: const BorderSide(color: border),
+  //       ),
+  //       title: const Text(
+  //         '환자 정보',
+  //         style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: text),
+  //       ),
+  //       content: Text(
+  //         '${p.patientName} (${p.patientAge}세)\npatient_code: ${p.patientCode}',
+  //         style: const TextStyle(fontWeight: FontWeight.w700, height: 1.4, color: text),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(ctx),
+  //           child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.w800)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 }

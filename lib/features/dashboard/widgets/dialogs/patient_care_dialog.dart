@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:mfps/features/meal/meal_tab.dart';
 
 /// 케어 입력 다이얼로그 (욕창단계입력 / 욕창정보 / 식단 / 실금)
 class PatientCareDialog extends StatefulWidget {
@@ -173,28 +174,99 @@ class _PatientCareDialogState extends State<PatientCareDialog>
                     const _PressureUlcerInputTab(),
 
                     // 탭 2: 욕창정보
-                    const Center(
-                      child: Text(
-                        '욕창단계정보',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF6B7280),
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 32),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            top: 14,
+                            left: 24,
+                            right: 24,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: const Color(0xFF6DC16A),
+                                  ),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    // 헤더
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 16,
+                                      ),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF6DC16A),
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: Radius.circular(18),
+                                          topRight: Radius.circular(18),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        '욕창 단계별 상세 특징',
+                                        style: TextStyle(
+                                          color: Color(0xFFFFFFFF),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+
+                                    // 표 본문
+                                    Column(
+                                      children: const [
+                                        StageRow(
+                                          title: '1단계(지속성 발적)',
+                                          description:
+                                              '피부 파괴는 없으나 붉거나 보라색으로 변하며,눌러도 창백해지지 않는 상태입니다. 주변 피부보다 따뜻하거나 단단하며, 통증이 있을 수 있습니다.',
+                                          diagramAsset:
+                                              'assets/images/stage1_diagram.png',
+                                        ),
+                                        StageRow(
+                                          title: '2단계(부분층 피부 손상)',
+                                          description:
+                                              '표피와 진피 일부가 파열된 상태로 물집(수포)이 생기거나 피부가 벗겨집니다. 얕은 궤양 형태이며 분홍색이나 붉은색을 띱니다.',
+                                          diagramAsset:
+                                              'assets/images/stage2_diagram.png',
+                                        ),
+                                        StageRow(
+                                          title: '3단계 (전층 피부 손상)',
+                                          description:
+                                              '피부 전층이 파괴되어 피하지방 조직까지 노출됩니다. 둥글게 파인 형태를 띠며, 괴사 조직과 심한 악취를 동반한 삼출물이 나타날 수 있습니다.',
+                                          diagramAsset:
+                                              'assets/images/stage3_diagram.png',
+                                        ),
+                                        StageRow(
+                                          title: '4단계 (광범위한 조직 손상)',
+                                          description:
+                                              '피부 전층뿐만 아니라 근육, 힘줄, 뼈까지 노출될 정도로 깊은 손상이 발생합니다. 괴사 조직 제거 및 봉합 등 적극적인 수술적 치료가 필요합니다.',
+                                          diagramAsset:
+                                              'assets/images/stage4_diagram.png',
+                                          showBottomBorder: false,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
 
                     // 탭 3: 식단
-                    const Center(
-                      child: Text(
-                        '식단',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ),
+                    const Center(child: MealTab()),
 
                     // 탭 4: 실금
                     const Center(
@@ -425,15 +497,15 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
           color: isActive
               ? const Color(0xFF4F83C1)
               : stage != null
-                  ? color
-                  : Colors.white,
+              ? color
+              : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
                 ? const Color(0xFF4F83C1)
                 : stage != null
-                    ? color
-                    : const Color(0xFF4F83C1),
+                ? color
+                : const Color(0xFF4F83C1),
           ),
           boxShadow: const [
             BoxShadow(
@@ -449,8 +521,8 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
             color: isActive
                 ? Colors.white
                 : stage != null
-                    ? Colors.white
-                    : const Color(0xFF4F83C1),
+                ? Colors.white
+                : const Color(0xFF4F83C1),
             fontSize: 12,
             fontWeight: FontWeight.w800,
           ),
@@ -519,15 +591,15 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                 color: isActive
                     ? const Color(0xFF4F83C1)
                     : stage != null
-                        ? color
-                        : Colors.white,
+                    ? color
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive
                       ? const Color(0xFF4F83C1)
                       : stage != null
-                          ? color
-                          : const Color(0xFF4F83C1),
+                      ? color
+                      : const Color(0xFF4F83C1),
                 ),
               ),
               child: Text(
@@ -536,8 +608,8 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                   color: isActive
                       ? Colors.white
                       : stage != null
-                          ? Colors.white
-                          : const Color(0xFF4F83C1),
+                      ? Colors.white
+                      : const Color(0xFF4F83C1),
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                 ),
@@ -618,7 +690,9 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                     const Text(
                       '선택 부위',
                       style: TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.w800),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -659,9 +733,7 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                             foregroundColor: isSelected
                                 ? Colors.white
                                 : const Color(0xFF374151),
-                            side: const BorderSide(
-                              color: Color(0xFF6183EE),
-                            ),
+                            side: const BorderSide(color: Color(0xFF6183EE)),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
                               vertical: 14,
@@ -672,8 +744,7 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                           ),
                           child: Text(
                             '$stage단계',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w500),
+                            style: const TextStyle(fontWeight: FontWeight.w500),
                           ),
                         );
                       }),
@@ -693,26 +764,28 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                       maxLines: 3,
                       decoration: InputDecoration(
                         hintText: '비고를 입력하세요',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFF9CA3AF),
-                        ),
+                        hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
                         filled: true,
                         fillColor: const Color(0xFFF9FAFB),
                         contentPadding: const EdgeInsets.all(14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE5E7EB)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE5E7EB),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE5E7EB)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE5E7EB),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: const BorderSide(
-                              color: Color(0xFF6183EE), width: 1.5),
+                            color: Color(0xFF6183EE),
+                            width: 1.5,
+                          ),
                         ),
                       ),
                     ),
@@ -724,8 +797,7 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                           onPressed: () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF374151),
-                            side:
-                                const BorderSide(color: Color(0xFFE5E7EB)),
+                            side: const BorderSide(color: Color(0xFFE5E7EB)),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -817,12 +889,10 @@ class _ConnectionLinePainter extends CustomPainter {
 
       if (p.labelLeft) {
         final lineEndX = imgLeft - 10;
-        canvas.drawLine(
-            Offset(dotX, dotY), Offset(lineEndX, dotY), linePaint);
+        canvas.drawLine(Offset(dotX, dotY), Offset(lineEndX, dotY), linePaint);
       } else {
         final lineEndX = imgLeft + imgW + 10;
-        canvas.drawLine(
-            Offset(dotX, dotY), Offset(lineEndX, dotY), linePaint);
+        canvas.drawLine(Offset(dotX, dotY), Offset(lineEndX, dotY), linePaint);
       }
     }
   }
@@ -842,6 +912,7 @@ class _PressureGraphCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
+      // color: const Color(0xFFFFFFFF),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -852,8 +923,7 @@ class _PressureGraphCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style:
-                const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           Expanded(
@@ -917,6 +987,79 @@ class _PressureGraphCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+//욕창 단계정보
+class StageRow extends StatelessWidget {
+  final String title;
+  final String description;
+  final String diagramAsset;
+  final bool showBottomBorder;
+
+  const StageRow({
+    super.key,
+    required this.title,
+    required this.description,
+    required this.diagramAsset,
+    this.showBottomBorder = true,
+    // required this.photoAsset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        border: showBottomBorder
+            ? const Border(
+                bottom: BorderSide(color: Color(0xFF6DC16A), width: 1),
+              )
+            : null, // ✅ 마지막이면 보더 없음
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 왼쪽 텍스트
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF374151),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 20),
+
+          // 오른쪽 이미지
+          Expanded(
+            flex: 2,
+            child: Column(
+              children: [
+                SizedBox(height: 130, child: Image.asset(diagramAsset)),
+              ],
             ),
           ),
         ],
