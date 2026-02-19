@@ -26,7 +26,8 @@ class _IncontinenceBottomSheetState extends State<IncontinenceBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Container(
+      color: Colors.white,
       padding: EdgeInsets.fromLTRB(
         24,
         16,
@@ -46,6 +47,10 @@ class _IncontinenceBottomSheetState extends State<IncontinenceBottomSheet> {
           SwitchListTile(
             title: const Text('실금 발생'),
             value: _hasIncontinence,
+            activeThumbColor: Colors.white,
+            activeTrackColor: const Color(0xFF6183EE),
+            inactiveThumbColor: Colors.white,
+            inactiveTrackColor: const Color(0xFFE5E7EB),
             onChanged: (v) {
               setState(() {
                 _hasIncontinence = v;
@@ -60,14 +65,20 @@ class _IncontinenceBottomSheetState extends State<IncontinenceBottomSheet> {
             children: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('취소'),
+                child: const Text(
+                  '취소',
+                  style: TextStyle(color: Color(0xFF6B7280)),
+                ),
               ),
               const SizedBox(width: 12),
               ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6183EE),
+                ),
                 onPressed: () {
                   Navigator.pop(context, _hasIncontinence);
                 },
-                child: const Text('저장'),
+                child: const Text('저장', style: TextStyle(color: Colors.black)),
               ),
             ],
           ),

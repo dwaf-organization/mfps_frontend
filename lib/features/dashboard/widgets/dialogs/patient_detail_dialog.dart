@@ -10,9 +10,34 @@ import 'package:http/http.dart' as http;
 
 // ✅ Bluetooth 추가
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart' as classic;
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../urlConfig.dart';
 import 'patient_edit_dialog.dart';
+
+// ✅ BLE / Classic BT 통합 선택 결과
+enum _BtType { ble, classic }
+
+class _SelectedDevice {
+  final _BtType type;
+  final BluetoothDevice? bleDevice;
+  final classic.BluetoothDevice? classicDevice;
+
+  const _SelectedDevice.ble(this.bleDevice)
+      : type = _BtType.ble,
+        classicDevice = null;
+  const _SelectedDevice.classic(this.classicDevice)
+      : type = _BtType.classic,
+        bleDevice = null;
+
+  String get displayName {
+    if (bleDevice != null) {
+      final n = bleDevice!.platformName;
+      return n.isNotEmpty ? n : 'BLE 기기';
+    }
+    return classicDevice?.name ?? 'Classic 기기';
+  }
+}
 
 class _BlePacket {
   final int deviceCode;
@@ -88,6 +113,10 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
   // ✅ BLE 수신값 POST 디바운스(너무 자주 POST/GET 방지)
   Timer? _blePostDebounce;
   bool _bleAutoPostEnabled = true;
+
+  // ✅ Classic Bluetooth (SPP) 상태
+  classic.BluetoothConnection? _classicConnection;
+  StreamSubscription? _classicDataSub;
   // =========================================================
 
   // ✅ 비고 입력
@@ -476,10 +505,13 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     }
   }
 
+  bool get _isAnyConnected =>
+      _connectedDevice != null || _classicConnection != null;
+
   Future<void> _onBleButtonPressed() async {
     if (_isConnectingBle) return;
 
-    if (_connectedDevice == null) {
+    if (!_isAnyConnected) {
       await _connectBluetooth();
     } else {
       await _disconnectBluetooth();
@@ -490,17 +522,16 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     setState(() => _isConnectingBle = true);
 
     try {
-      final isOn = await FlutterBluePlus.isOn;
-      if (!isOn) {
-        _snack('블루투스를 켜주세요');
-        return;
-      }
-
-      // 스캔 다이얼로그
-      final BluetoothDevice? selected = await _showScanningDialog();
+      // 스캔 다이얼로그 (BLE + Classic 통합)
+      final _SelectedDevice? selected = await _showScanningDialog();
       if (selected == null) return;
 
-      await _connectToDevice(selected);
+      if (selected.type == _BtType.ble && selected.bleDevice != null) {
+        await _connectToDevice(selected.bleDevice!);
+      } else if (selected.type == _BtType.classic &&
+          selected.classicDevice != null) {
+        await _connectToClassicDevice(selected.classicDevice!);
+      }
     } catch (e) {
       _snack('블루투스 연결 실패: $e');
       debugPrint('블루투스 연결 오류: $e');
@@ -509,8 +540,8 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     }
   }
 
-  Future<BluetoothDevice?> _showScanningDialog() async {
-    return showDialog<BluetoothDevice>(
+  Future<_SelectedDevice?> _showScanningDialog() async {
+    return showDialog<_SelectedDevice>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _ScanningDialog(),
@@ -549,6 +580,53 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     } catch (e) {
       _snack('연결 실패: $e');
       debugPrint('기기 연결 오류: $e');
+    }
+  }
+
+  // ✅ Classic Bluetooth (SPP) 연결
+  Future<void> _connectToClassicDevice(classic.BluetoothDevice device) async {
+    try {
+      _snack('${device.name ?? '기기'}에 연결 중...');
+
+      final connection = await classic.BluetoothConnection.toAddress(
+        device.address,
+      );
+
+      _classicConnection = connection;
+
+      if (!mounted) return;
+      setState(() {
+        _connectionStatus = '연결됨 (${device.name ?? 'Unknown'})';
+      });
+
+      _snack('블루투스 연결 성공');
+
+      // Serial 데이터 수신 → 기존 _handleReceivedData 재사용
+      List<int> buffer = [];
+      _classicDataSub = connection.input?.listen(
+        (data) {
+          buffer.addAll(data);
+          // 8바이트 패킷 단위로 파싱
+          while (buffer.length >= 8) {
+            final packet = buffer.sublist(0, 8);
+            buffer = buffer.sublist(8);
+            _handleReceivedData(packet);
+          }
+        },
+        onDone: () {
+          if (!mounted) return;
+          setState(() {
+            _classicConnection = null;
+            _connectionStatus = '연결 끊김';
+          });
+        },
+        onError: (e) {
+          debugPrint('Classic BT 수신 오류: $e');
+        },
+      );
+    } catch (e) {
+      _snack('연결 실패: $e');
+      debugPrint('Classic BT 연결 오류: $e');
     }
   }
 
@@ -717,12 +795,21 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
   }
 
   Future<void> _disconnectBluetooth() async {
+    // BLE 해제
     final d = _connectedDevice;
-    if (d == null) return;
+    if (d != null) {
+      try {
+        await d.disconnect();
+      } catch (_) {}
+    }
 
+    // Classic BT 해제
+    _classicDataSub?.cancel();
+    _classicDataSub = null;
     try {
-      await d.disconnect();
+      _classicConnection?.finish();
     } catch (_) {}
+    _classicConnection = null;
 
     if (!mounted) return;
     setState(() {
@@ -769,17 +856,20 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text(
               '닫기',
-              style: TextStyle(fontWeight: FontWeight.w800),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF374151),
+              ),
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              // elevation: 0,
+              // shape: RoundedRectangleBorder(
+              //   borderRadius: BorderRadius.circular(12),
+              // ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text(
@@ -1023,10 +1113,10 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                   // ),
                   const SizedBox(width: 10),
 
-                  // ✅ BLE 버튼 (추가)
+                  // ✅ BLE / Classic BT 버튼
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _connectedDevice == null
+                      backgroundColor: !_isAnyConnected
                           ? const Color.fromARGB(255, 96, 134, 218)
                           : const Color(0xFFEF4444),
                       foregroundColor: Colors.white,
@@ -1050,15 +1140,14 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
                             ),
                           )
                         : Icon(
-                            _connectedDevice == null
-                                // ? Icons.bluetooth
-                                ? Icons.bluetooth_disabled
+                            _isAnyConnected
+                                ? Icons.bluetooth_connected
                                 : Icons.bluetooth_disabled,
                           ),
                     label: Text(
                       _isConnectingBle
                           ? '연결 중...'
-                          : (_connectedDevice == null ? '연결' : '연결 해제'),
+                          : (!_isAnyConnected ? '연결' : '연결 해제'),
                       style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
                   ),
@@ -1277,6 +1366,11 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     _blePostDebounce?.cancel();
     _connSub?.cancel();
     _connectedDevice?.disconnect();
+    // Classic BT 정리
+    _classicDataSub?.cancel();
+    try {
+      _classicConnection?.finish();
+    } catch (_) {}
     super.dispose();
   }
 }
@@ -2107,28 +2201,51 @@ String _fmtDateTime(DateTime t) {
 }
 
 // =========================================================
-// ✅ 실시간 스캔 다이얼로그 (추가된 부분)
+// ✅ BLE + Classic BT 통합 스캔 다이얼로그
 // =========================================================
 
-// 실시간 스캔 다이얼로그 (UI 스타일 개선)
+/// 통합 스캔 리스트 아이템
+class _ScannedItem {
+  final _BtType type;
+  final String name;
+  final String address;
+  final int rssi;
+
+  // 선택 시 반환용
+  final BluetoothDevice? bleDevice;
+  final classic.BluetoothDevice? classicDevice;
+
+  const _ScannedItem({
+    required this.type,
+    required this.name,
+    required this.address,
+    required this.rssi,
+    this.bleDevice,
+    this.classicDevice,
+  });
+
+  bool get hasName => name.isNotEmpty && !name.startsWith('알 수 없는');
+}
+
 class _ScanningDialog extends StatefulWidget {
   @override
   _ScanningDialogState createState() => _ScanningDialogState();
 }
 
 class _ScanningDialogState extends State<_ScanningDialog> {
-  List<BluetoothDevice> _devices = [];
+  final List<_ScannedItem> _items = [];
   bool _isScanning = true;
 
-  // ✅ 톤 통일(화이트 + 그린 포인트)
   static const _cBg = Color(0xFFFAFAFA);
   static const _cCard = Colors.white;
   static const _cBorder = Color(0xFFE5E7EB);
   static const _cText = Color(0xFF111827);
   static const _cSub = Color(0xFF6B7280);
   static const _cGreen = Color(0xFF22C55E);
+  static const _cBlue = Color(0xFF3B82F6);
 
-  StreamSubscription<List<ScanResult>>? _scanSub;
+  StreamSubscription<List<ScanResult>>? _bleScanSub;
+  StreamSubscription<classic.BluetoothDiscoveryResult>? _classicScanSub;
 
   @override
   void initState() {
@@ -2138,7 +2255,8 @@ class _ScanningDialogState extends State<_ScanningDialog> {
 
   @override
   void dispose() {
-    _scanSub?.cancel();
+    _bleScanSub?.cancel();
+    _classicScanSub?.cancel();
     FlutterBluePlus.stopScan();
     super.dispose();
   }
@@ -2146,29 +2264,137 @@ class _ScanningDialogState extends State<_ScanningDialog> {
   Future<void> _startScanning() async {
     setState(() {
       _isScanning = true;
-      _devices.clear();
+      _items.clear();
+    });
+
+    // ✅ 1) 이미 페어링된(bonded) Classic 기기를 먼저 표시
+    try {
+      final bonded =
+          await classic.FlutterBluetoothSerial.instance.getBondedDevices();
+      debugPrint('[CLASSIC] bonded devices: ${bonded.length}');
+      if (mounted) {
+        setState(() {
+          for (final d in bonded) {
+            final addr = d.address;
+            if (addr.isEmpty) continue;
+            final deviceName = d.name;
+            _items.add(_ScannedItem(
+              type: _BtType.classic,
+              name: (deviceName == null || deviceName.isEmpty)
+                  ? '페어링된 기기'
+                  : '$deviceName (페어링됨)',
+              address: addr,
+              rssi: 0,
+              classicDevice: d,
+            ));
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[CLASSIC BONDED] error: $e');
+    }
+
+    // ✅ 2) BLE 스캔 (이름 있는 기기만 표시)
+    _bleScanSub?.cancel();
+    _bleScanSub = FlutterBluePlus.scanResults.listen((results) {
+      if (!mounted) return;
+      setState(() {
+        for (final r in results) {
+          final advName = r.advertisementData.advName;
+          final platName = r.device.platformName;
+          final name = advName.isNotEmpty
+              ? advName
+              : (platName.isNotEmpty ? platName : '');
+
+          // ✅ 이름 없는 BLE 기기는 목록에서 제외
+          if (name.isEmpty) continue;
+
+          final addr = r.device.remoteId.str;
+          final idx = _items.indexWhere((i) => i.address == addr);
+
+          final item = _ScannedItem(
+            type: _BtType.ble,
+            name: name,
+            address: addr,
+            rssi: r.rssi,
+            bleDevice: r.device,
+          );
+
+          if (idx >= 0) {
+            _items[idx] = item;
+          } else {
+            _items.add(item);
+          }
+        }
+        _sortItems();
+      });
     });
 
     try {
-      _scanSub?.cancel();
-      _scanSub = FlutterBluePlus.scanResults.listen((results) {
-        if (!mounted) return;
-        setState(() {
-          for (final result in results) {
-            if (!_devices.any((d) => d.id == result.device.id)) {
-              _devices.add(result.device);
-            }
-          }
-        });
-      });
-
       await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
-
-      await Future.delayed(const Duration(seconds: 10));
-      if (mounted) setState(() => _isScanning = false);
-    } catch (_) {
-      if (mounted) setState(() => _isScanning = false);
+    } catch (e) {
+      debugPrint('[BLE SCAN] error: $e');
     }
+
+    // ✅ 3) Classic Bluetooth 검색 (새로 발견되는 기기)
+    _classicScanSub?.cancel();
+    try {
+      debugPrint('[CLASSIC] starting discovery...');
+      _classicScanSub = classic.FlutterBluetoothSerial.instance
+          .startDiscovery()
+          .listen(
+        (r) {
+          if (!mounted) return;
+          debugPrint(
+              '[CLASSIC] found: ${r.device.name} / ${r.device.address}');
+          setState(() {
+            final addr = r.device.address;
+            if (addr.isEmpty) return;
+
+            // 이미 같은 MAC이면 업데이트
+            final idx = _items.indexWhere((i) => i.address == addr);
+            final deviceName = r.device.name;
+            final item = _ScannedItem(
+              type: _BtType.classic,
+              name: (deviceName == null || deviceName.isEmpty)
+                  ? '알 수 없는 기기'
+                  : deviceName,
+              address: addr,
+              rssi: r.rssi,
+              classicDevice: r.device,
+            );
+
+            if (idx >= 0) {
+              _items[idx] = item; // 페어링 목록의 것을 갱신
+            } else {
+              _items.add(item);
+            }
+            _sortItems();
+          });
+        },
+        onError: (e) {
+          debugPrint('[CLASSIC DISCOVERY] stream error: $e');
+        },
+        onDone: () {
+          debugPrint('[CLASSIC DISCOVERY] done');
+        },
+      );
+    } catch (e) {
+      debugPrint('[CLASSIC SCAN] error: $e');
+    }
+
+    // 스캔 종료 대기
+    await Future.delayed(const Duration(seconds: 12));
+    if (mounted) setState(() => _isScanning = false);
+  }
+
+  void _sortItems() {
+    _items.sort((a, b) {
+      // 이름 있는 기기 상단
+      if (a.hasName && !b.hasName) return -1;
+      if (!a.hasName && b.hasName) return 1;
+      return b.rssi.compareTo(a.rssi);
+    });
   }
 
   @override
@@ -2275,8 +2501,8 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                         Expanded(
                           child: Text(
                             _isScanning
-                                ? '검색 중입니다...  (${_devices.length}개 발견)'
-                                : '검색 완료  (${_devices.length}개)',
+                                ? '검색 중입니다...  (${_items.length}개 발견)'
+                                : '검색 완료  (${_items.length}개)',
                             style: const TextStyle(
                               color: _cText,
                               fontWeight: FontWeight.w800,
@@ -2306,7 +2532,44 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                     ),
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
+
+                  // ✅ 안내 문구
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFFFCD34D),
+                      ),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Color(0xFFB45309),
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '기기가 안 보이면 태블릿 설정 → 블루투스에서 먼저 페어링하세요',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFB45309),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
 
                   // 목록 컨테이너
                   Container(
@@ -2316,7 +2579,7 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(color: _cBorder),
                     ),
-                    child: _devices.isEmpty
+                    child: _items.isEmpty
                         ? Center(
                             child: Padding(
                               padding: const EdgeInsets.all(24.0),
@@ -2356,18 +2619,23 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                           )
                         : ListView.separated(
                             padding: const EdgeInsets.all(12),
-                            itemCount: _devices.length,
+                            itemCount: _items.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 10),
                             itemBuilder: (context, index) {
-                              final device = _devices[index];
-                              final name = device.name.isEmpty
-                                  ? '알 수 없는 기기 ${index + 1}'
-                                  : device.name;
-                              final mac = device.id.id;
+                              final item = _items[index];
+                              final isBle = item.type == _BtType.ble;
+                              final typeLabel = isBle ? 'BLE' : 'Classic';
+                              final typeColor = isBle ? _cBlue : _cGreen;
 
                               return InkWell(
-                                onTap: () => Navigator.of(context).pop(device),
+                                onTap: () {
+                                  final selected = isBle
+                                      ? _SelectedDevice.ble(item.bleDevice)
+                                      : _SelectedDevice.classic(
+                                          item.classicDevice);
+                                  Navigator.of(context).pop(selected);
+                                },
                                 borderRadius: BorderRadius.circular(16),
                                 child: Container(
                                   padding: const EdgeInsets.all(14),
@@ -2382,15 +2650,15 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                                         width: 44,
                                         height: 44,
                                         decoration: BoxDecoration(
-                                          color: _cGreen.withOpacity(0.10),
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                          border: Border.all(color: _cBorder),
+                                          color: typeColor.withOpacity(0.10),
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          border:
+                                              Border.all(color: _cBorder),
                                         ),
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.bluetooth,
-                                          color: _cGreen,
+                                          color: typeColor,
                                         ),
                                       ),
                                       const SizedBox(width: 12),
@@ -2399,18 +2667,50 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              name,
-                                              style: const TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w900,
-                                                color: _cText,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
+                                            Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    item.name,
+                                                    style: const TextStyle(
+                                                      fontSize: 15,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      color: _cText,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: typeColor
+                                                        .withOpacity(0.12),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            6),
+                                                  ),
+                                                  child: Text(
+                                                    typeLabel,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      color: typeColor,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
-                                              'MAC  $mac',
+                                              'MAC  ${item.address}  ·  신호 ${item.rssi}dBm',
                                               style: const TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w700,
@@ -2429,9 +2729,8 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: _cGreen,
-                                          borderRadius: BorderRadius.circular(
-                                            999,
-                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(999),
                                         ),
                                         child: const Text(
                                           '선택',

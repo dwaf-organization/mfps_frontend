@@ -179,23 +179,27 @@ class BedTile extends StatelessWidget {
                           Expanded(
                             child: SizedBox(
                               height: isCompact ? 28 : 32,
-                              child: OutlinedButton(
+                              child: OutlinedButton.icon(
                                 onPressed: onInfoTap,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF2563EB),
-                                  side: const BorderSide(
-                                    color: Color(0xFF2563EB),
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  padding: EdgeInsets.zero,
+                                icon: Icon(
+                                  Icons.info_outline,
+                                  size: isCompact ? 12 : 14,
                                 ),
-                                child: Text(
+                                label: Text(
                                   '정보',
                                   style: TextStyle(
                                     fontSize: isCompact ? 10 : 11,
                                     fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF3B82F6),
+                                  side: const BorderSide(
+                                    color: Color(0xFF3B82F6),
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
                               ),
@@ -205,23 +209,27 @@ class BedTile extends StatelessWidget {
                           Expanded(
                             child: SizedBox(
                               height: isCompact ? 28 : 32,
-                              child: OutlinedButton(
+                              child: OutlinedButton.icon(
                                 onPressed: onCareTap,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF7F9BD8),
-                                  side: const BorderSide(
-                                    color: Color(0xFF7F9BD8),
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  padding: EdgeInsets.zero,
+                                icon: Icon(
+                                  Icons.medical_services_outlined,
+                                  size: isCompact ? 12 : 14,
                                 ),
-                                child: Text(
+                                label: Text(
                                   '케어',
                                   style: TextStyle(
                                     fontSize: isCompact ? 10 : 11,
                                     fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF7C3AED),
+                                  side: const BorderSide(
+                                    color: Color(0xFF7C3AED),
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
                               ),

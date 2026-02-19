@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:mfps/features/meal/meal_tab.dart';
+import 'package:mfps/features/calender/widget/month_calendar.dart';
 
 /// 케어 입력 다이얼로그 (욕창단계입력 / 욕창정보 / 식단 / 실금)
 class PatientCareDialog extends StatefulWidget {
@@ -46,7 +47,7 @@ class _PatientCareDialogState extends State<PatientCareDialog>
         width: 1120,
         decoration: BoxDecoration(
           color: const Color(0xFFFFFFFF),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFFE5E7EB)),
           boxShadow: const [
             BoxShadow(
@@ -166,7 +167,13 @@ class _PatientCareDialogState extends State<PatientCareDialog>
             // 탭 내용
             Flexible(
               child: Container(
-                color: const Color(0xFFF3F4F6),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.vertical(
+                    bottom: Radius.circular(24),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
                 child: TabBarView(
                   controller: _tabController,
                   children: [
@@ -269,15 +276,9 @@ class _PatientCareDialogState extends State<PatientCareDialog>
                     const Center(child: MealTab()),
 
                     // 탭 4: 실금
-                    const Center(
-                      child: Text(
-                        '실금',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
+                    const SingleChildScrollView(
+                      padding: EdgeInsets.all(24),
+                      child: MonthCalendar(),
                     ),
                   ],
                 ),

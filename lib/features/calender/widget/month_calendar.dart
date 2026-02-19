@@ -10,6 +10,7 @@ class MonthCalendar extends StatefulWidget {
 
 class _MonthCalendarState extends State<MonthCalendar> {
   DateTime _focusedMonth = DateTime.now();
+  late DateTime _selectedDate = _normalize(DateTime.now());
 
   final Map<DateTime, bool> _incontinenceMap = {};
 
@@ -21,10 +22,11 @@ class _MonthCalendarState extends State<MonthCalendar> {
     final normalized = _normalize(date);
 
     final result = await showModalBottomSheet<bool>(
+      constraints: const BoxConstraints(maxWidth: 800),
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) {
         return IncontinenceBottomSheet(
@@ -78,11 +80,17 @@ class _MonthCalendarState extends State<MonthCalendar> {
             final date = days[index];
             final normalized = _normalize(date);
 
+            final today = _normalize(DateTime.now());
+            final isSelected = normalized == _selectedDate;
+
             return _CalendarCell(
               date: date,
               isCurrentMonth: date.month == _focusedMonth.month,
+              isToday: normalized == today,
+              isSelected: isSelected,
               hasIncontinence: _incontinenceMap[normalized] == true,
               onTap: () {
+                setState(() => _selectedDate = normalized);
                 _onDateTap(date);
               },
             );
@@ -150,12 +158,16 @@ class _MonthCalendarState extends State<MonthCalendar> {
 class _CalendarCell extends StatelessWidget {
   final DateTime date;
   final bool isCurrentMonth;
+  final bool isToday;
+  final bool isSelected;
   final VoidCallback onTap;
   final bool hasIncontinence;
 
   const _CalendarCell({
     required this.date,
     required this.isCurrentMonth,
+    required this.isToday,
+    required this.isSelected,
     required this.onTap,
     required this.hasIncontinence,
   });
@@ -166,9 +178,12 @@ class _CalendarCell extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFFE5E7EB),
+            width: isSelected ? 2 : 1,
+          ),
         ),
         child: Stack(
           children: [
@@ -177,13 +192,32 @@ class _CalendarCell extends StatelessWidget {
               alignment: Alignment.topLeft,
               child: Padding(
                 padding: const EdgeInsets.all(8),
-                child: Text(
-                  '${date.day}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: isCurrentMonth
-                        ? const Color(0xFF111827)
-                        : const Color(0xFF9CA3AF),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: isSelected
+                      ? BoxDecoration(
+                          color: const Color(0xFF3B82F6),
+                          borderRadius: BorderRadius.circular(12),
+                        )
+                      : isToday
+                          ? BoxDecoration(
+                              color: const Color(0xFF6DC16A),
+                              borderRadius: BorderRadius.circular(12),
+                            )
+                          : null,
+                  child: Text(
+                    '${date.day}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: (isSelected || isToday)
+                          ? Colors.white
+                          : isCurrentMonth
+                          ? const Color(0xFF111827)
+                          : const Color(0xFF9CA3AF),
+                    ),
                   ),
                 ),
               ),
