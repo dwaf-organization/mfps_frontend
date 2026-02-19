@@ -9,8 +9,8 @@ import '../../../urlConfig.dart';
 import 'bed_tile.dart';
 
 import 'dialogs/patient_add_dialog.dart';
-import 'dialogs/patient_detail_dialog.dart';
-import 'dialogs/patient_care_dialog.dart';
+import '../pages/patient_detail_page.dart';
+import '../pages/patient_care_page.dart';
 
 /// 명세 예시:
 /// GET /api/hospital/structure?hospital_st_code=<floorStCode>
@@ -374,7 +374,7 @@ class _RoomCardState extends State<RoomCard> {
                 crossAxisCount: 4,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 14,
-                childAspectRatio: 1.0,
+                childAspectRatio: 0.72,
               ),
               itemBuilder: (context, i) {
                 final bed = beds[i];
@@ -404,30 +404,34 @@ class _RoomCardState extends State<RoomCard> {
                   onInfoTap: patient == null
                       ? null
                       : () async {
-                          await showDialog(
-                            context: context,
-                            builder: (ctx) => PatientDetailDialog(
-                              patientCode: patient.patientCode,
-                              roomLabel: room.categoryName,
-                              bedLabel: bed.categoryName,
-                              onRefresh: null,
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) => PatientDetailPage(
+                                patientCode: patient.patientCode,
+                                roomLabel: room.categoryName,
+                                bedLabel: bed.categoryName,
+                                onRefresh: null,
+                              ),
                             ),
                           );
                           if (widget.onRefresh != null) {
                             await widget.onRefresh!();
                           }
                         },
-                  // ✅ 케어 버튼 → PatientCareDialog
+                  // ✅ 케어 버튼 → PatientCarePage
                   onCareTap: patient == null
                       ? null
                       : () async {
-                          await showDialog(
-                            context: context,
-                            builder: (ctx) => PatientCareDialog(
-                              patientCode: patient.patientCode,
-                              patientName: patient.patientName,
-                              roomLabel: room.categoryName,
-                              bedLabel: bed.categoryName,
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) => PatientCarePage(
+                                patientCode: patient.patientCode,
+                                patientName: patient.patientName,
+                                roomLabel: room.categoryName,
+                                bedLabel: bed.categoryName,
+                              ),
                             ),
                           );
                         },

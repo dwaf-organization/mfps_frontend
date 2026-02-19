@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'patient_list_card.dart'; // RiskStatus / statusColor / riskFromWarningInt 재사용
 
+/// ✅ 블루투스 연결 상태
+enum BluetoothConnectionStatus { disconnected, connecting, connected }
+
 /// ✅ /api/hospital/structure (beds[].patient) 에 맞춘 침대의 환자 요약
 class BedPatientItem {
   final int patientCode;
@@ -18,7 +21,7 @@ class BedPatientItem {
   RiskStatus get status => riskFromWarningInt(patientWarning);
 }
 
-class BedTile extends StatelessWidget {
+class BedTile extends StatefulWidget {
   final int bedNo;
   final BedPatientItem? patient;
 
@@ -41,10 +44,19 @@ class BedTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final has = patient != null;
+  State<BedTile> createState() => _BedTileState();
+}
 
-    final RiskStatus? status = has ? patient!.status : null;
+class _BedTileState extends State<BedTile> {
+  BluetoothConnectionStatus _bluetoothStatus =
+      BluetoothConnectionStatus.disconnected;
+  String? _connectedDeviceName;
+
+  @override
+  Widget build(BuildContext context) {
+    final has = widget.patient != null;
+
+    final RiskStatus? status = has ? widget.patient!.status : null;
     final Color border = has ? statusColor(status!) : const Color(0xFFD1D5DB);
     final Color bg = has
         ? statusColor(status!).withOpacity(0.06)
@@ -78,7 +90,7 @@ class BedTile extends StatelessWidget {
         );
 
         return InkWell(
-          onTap: has ? null : onTap,
+          onTap: has ? null : widget.onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: EdgeInsets.all(pad),
@@ -137,7 +149,7 @@ class BedTile extends StatelessWidget {
 
                     FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text('침대 $bedNo', style: bedTextStyle),
+                      child: Text('침대 ${widget.bedNo}', style: bedTextStyle),
                     ),
 
                     SizedBox(height: isCompact ? 6 : 8),
@@ -153,7 +165,7 @@ class BedTile extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: Text(
-                          patient!.patientName,
+                          widget.patient!.patientName,
                           textAlign: TextAlign.center,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -164,11 +176,54 @@ class BedTile extends StatelessWidget {
                       SizedBox(height: isCompact ? 2 : 4),
 
                       Text(
-                        '${patient!.patientAge}세',
+                        '${widget.patient!.patientAge}세',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: ageStyle,
                         textAlign: TextAlign.center,
+                      ),
+
+                      SizedBox(height: isCompact ? 4 : 6),
+
+                      // ✅ 블루투스 연결 상태 표시
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isCompact ? 6 : 8,
+                          vertical: isCompact ? 3 : 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getBluetoothStatusColor().withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _getBluetoothStatusColor(),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getBluetoothStatusIcon(),
+                              size: isCompact ? 10 : 12,
+                              color: _getBluetoothStatusColor(),
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                _getBluetoothStatusText(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: _getBluetoothStatusColor(),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: isCompact ? 9 : 10,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
 
                       SizedBox(height: isCompact ? 6 : 10),
@@ -180,7 +235,7 @@ class BedTile extends StatelessWidget {
                             child: SizedBox(
                               height: isCompact ? 28 : 32,
                               child: OutlinedButton.icon(
-                                onPressed: onInfoTap,
+                                onPressed: widget.onInfoTap,
                                 icon: Icon(
                                   Icons.info_outline,
                                   size: isCompact ? 12 : 14,
@@ -210,7 +265,7 @@ class BedTile extends StatelessWidget {
                             child: SizedBox(
                               height: isCompact ? 28 : 32,
                               child: OutlinedButton.icon(
-                                onPressed: onCareTap,
+                                onPressed: widget.onCareTap,
                                 icon: Icon(
                                   Icons.medical_services_outlined,
                                   size: isCompact ? 12 : 14,
@@ -237,6 +292,39 @@ class BedTile extends StatelessWidget {
                           ),
                         ],
                       ),
+
+                      SizedBox(height: isCompact ? 4 : 6),
+
+                      // ✅ 블루투스 연결 버튼
+                      SizedBox(
+                        width: double.infinity,
+                        height: isCompact ? 28 : 32,
+                        child: OutlinedButton.icon(
+                          onPressed: _handleBluetoothTap,
+                          icon: Icon(
+                            Icons.bluetooth,
+                            size: isCompact ? 12 : 14,
+                          ),
+                          label: Text(
+                            _bluetoothStatus ==
+                                    BluetoothConnectionStatus.connected
+                                ? '연결해제'
+                                : '블루투스',
+                            style: TextStyle(
+                              fontSize: isCompact ? 10 : 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _getBluetoothStatusColor(),
+                            side: BorderSide(color: _getBluetoothStatusColor()),
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
                     ] else ...[
                       SizedBox(height: isCompact ? 10 : 18),
                       const Text(
@@ -260,5 +348,68 @@ class BedTile extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// 블루투스 버튼 탭 핸들러
+  Future<void> _handleBluetoothTap() async {
+    if (widget.patient == null) return;
+
+    if (_bluetoothStatus == BluetoothConnectionStatus.connected) {
+      // 연결 해제
+      setState(() {
+        _bluetoothStatus = BluetoothConnectionStatus.disconnected;
+        _connectedDeviceName = null;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('블루투스 연결이 해제되었습니다.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      // 연결 시작 - 상세 페이지로 이동
+      if (widget.onInfoTap != null) {
+        widget.onInfoTap!();
+      }
+    }
+  }
+
+  /// 블루투스 상태별 색상
+  Color _getBluetoothStatusColor() {
+    switch (_bluetoothStatus) {
+      case BluetoothConnectionStatus.disconnected:
+        return const Color(0xFF9CA3AF); // Gray
+      case BluetoothConnectionStatus.connecting:
+        return const Color(0xFFF59E0B); // Amber
+      case BluetoothConnectionStatus.connected:
+        return const Color(0xFF10B981); // Green
+    }
+  }
+
+  /// 블루투스 상태별 아이콘
+  IconData _getBluetoothStatusIcon() {
+    switch (_bluetoothStatus) {
+      case BluetoothConnectionStatus.disconnected:
+        return Icons.bluetooth_disabled;
+      case BluetoothConnectionStatus.connecting:
+        return Icons.bluetooth_searching;
+      case BluetoothConnectionStatus.connected:
+        return Icons.bluetooth_connected;
+    }
+  }
+
+  /// 블루투스 상태별 텍스트
+  String _getBluetoothStatusText() {
+    switch (_bluetoothStatus) {
+      case BluetoothConnectionStatus.disconnected:
+        return '연결 안됨';
+      case BluetoothConnectionStatus.connecting:
+        return '연결 중...';
+      case BluetoothConnectionStatus.connected:
+        return _connectedDeviceName ?? '연결됨';
+    }
   }
 }
