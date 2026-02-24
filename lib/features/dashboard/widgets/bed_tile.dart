@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'patient_list_card.dart'; // RiskStatus / statusColor / riskFromWarningInt 재사용
+import '../services/bluetooth_connection_manager.dart';
+import 'bluetooth_scan_dialog.dart';
 
 /// ✅ 블루투스 연결 상태
 enum BluetoothConnectionStatus { disconnected, connecting, connected }
@@ -48,9 +51,46 @@ class BedTile extends StatefulWidget {
 }
 
 class _BedTileState extends State<BedTile> {
+  final _btManager = BluetoothConnectionManager();
+  StreamSubscription<Map<int, PatientBluetoothConnection>>? _btStateSub;
+
   BluetoothConnectionStatus _bluetoothStatus =
       BluetoothConnectionStatus.disconnected;
   String? _connectedDeviceName;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateBluetoothStatus();
+
+    // 블루투스 상태 변경 리스닝
+    _btStateSub = _btManager.stateStream.listen((_) {
+      if (mounted) {
+        _updateBluetoothStatus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _btStateSub?.cancel();
+    super.dispose();
+  }
+
+  void _updateBluetoothStatus() {
+    if (widget.patient == null) return;
+
+    final connection = _btManager.getConnection(widget.patient!.patientCode);
+    setState(() {
+      if (connection != null) {
+        _bluetoothStatus = BluetoothConnectionStatus.connected;
+        _connectedDeviceName = connection.deviceName;
+      } else {
+        _bluetoothStatus = BluetoothConnectionStatus.disconnected;
+        _connectedDeviceName = null;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -356,10 +396,7 @@ class _BedTileState extends State<BedTile> {
 
     if (_bluetoothStatus == BluetoothConnectionStatus.connected) {
       // 연결 해제
-      setState(() {
-        _bluetoothStatus = BluetoothConnectionStatus.disconnected;
-        _connectedDeviceName = null;
-      });
+      await _btManager.disconnect(widget.patient!.patientCode);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -370,9 +407,17 @@ class _BedTileState extends State<BedTile> {
         );
       }
     } else {
-      // 연결 시작 - 상세 페이지로 이동
-      if (widget.onInfoTap != null) {
-        widget.onInfoTap!();
+      // 블루투스 스캔 다이얼로그 표시
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => BluetoothScanDialog(
+          patientCode: widget.patient!.patientCode,
+          patientName: widget.patient!.patientName,
+        ),
+      );
+
+      if (result == true && mounted) {
+        _updateBluetoothStatus();
       }
     }
   }

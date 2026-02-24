@@ -15,6 +15,7 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../urlConfig.dart';
 import '../widgets/dialogs/patient_edit_dialog.dart';
+import '../services/bluetooth_connection_manager.dart';
 
 // ✅ BLE / Classic BT 통합 선택 결과
 enum _BtType { ble, classic }
@@ -117,6 +118,11 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
   // ✅ Classic Bluetooth (SPP) 상태
   classic.BluetoothConnection? _classicConnection;
   StreamSubscription? _classicDataSub;
+
+  // ✅ 외부(대시보드) 블루투스 연결 매니저 연동
+  final _btManager = BluetoothConnectionManager();
+  StreamSubscription<Map<int, PatientBluetoothConnection>>? _btManagerSub;
+  bool _managedExternally = false; // 외부에서 연결된 경우 dispose 시 연결 유지
   // =========================================================
 
   // ✅ 비고 입력
@@ -131,6 +137,86 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
 
     // ✅ 권한 요청 (추가)
     _checkBluetoothPermissions();
+
+    // ✅ 외부(대시보드) 블루투스 연결 확인 및 동기화
+    _syncFromManager();
+    _btManagerSub = _btManager.stateStream.listen((_) {
+      if (mounted) _syncFromManager();
+    });
+  }
+
+  /// BluetoothConnectionManager에서 이 환자의 연결 상태를 동기화
+  void _syncFromManager() {
+    final conn = _btManager.getConnection(widget.patientCode);
+    if (conn != null && _connectedDevice == null && _classicConnection == null) {
+      // 외부에서 연결된 블루투스가 있고, 현재 페이지에서는 연결 안 된 상태
+      _managedExternally = true;
+      if (conn.isBLE && conn.bleDevice != null) {
+        _restoreBleFromManager(conn.bleDevice!);
+      } else if (!conn.isBLE && conn.classicConnection != null) {
+        _restoreClassicFromManager(conn);
+      }
+    } else if (conn == null && _managedExternally) {
+      // 외부에서 연결 해제됨
+      setState(() {
+        _connectedDevice = null;
+        _classicConnection = null;
+        _writeChar = null;
+        _notifyChar = null;
+        _connectionStatus = '연결 안됨';
+        _latestBleData = [];
+        _managedExternally = false;
+      });
+    }
+  }
+
+  /// 매니저의 BLE 연결을 이 페이지에서 사용할 수 있도록 복원
+  Future<void> _restoreBleFromManager(BluetoothDevice device) async {
+    try {
+      final services = await device.discoverServices();
+      final ok = await _setupCharacteristics(device, services);
+      if (!ok) return;
+
+      if (!mounted) return;
+      setState(() {
+        _connectedDevice = device;
+        _connectionStatus =
+            '연결됨 (${device.platformName.isEmpty ? 'Unknown' : device.platformName})';
+      });
+      _monitorConnection(device);
+    } catch (e) {
+      debugPrint('매니저 BLE 복원 오류: $e');
+    }
+  }
+
+  /// 매니저의 Classic 연결을 이 페이지에서 사용할 수 있도록 복원
+  void _restoreClassicFromManager(PatientBluetoothConnection conn) {
+    _classicConnection = conn.classicConnection;
+
+    if (!mounted) return;
+    setState(() {
+      _connectionStatus = '연결됨 (${conn.deviceName})';
+    });
+
+    List<int> buffer = [];
+    _classicDataSub = conn.classicConnection?.input?.listen(
+      (data) {
+        buffer.addAll(data);
+        while (buffer.length >= 8) {
+          final packet = buffer.sublist(0, 8);
+          buffer = buffer.sublist(8);
+          _handleReceivedData(packet);
+        }
+      },
+      onDone: () {
+        if (!mounted) return;
+        setState(() {
+          _connectionStatus = '연결 끊김';
+          _classicConnection = null;
+          _managedExternally = false;
+        });
+      },
+    );
   }
 
   void _snack(String msg) {
@@ -554,9 +640,16 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
 
       setState(() {
         _connectedDevice = device;
+        _managedExternally = false;
         _connectionStatus =
             '연결됨 (${device.name.isEmpty ? 'Unknown' : device.name})';
       });
+
+      // ✅ 매니저에도 등록 (대시보드 BedTile에 연결 상태 반영)
+      await _btManager.connectBLE(
+        patientCode: widget.patientCode,
+        device: device,
+      );
 
       _snack('블루투스 연결 성공');
 
@@ -576,11 +669,18 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
       );
 
       _classicConnection = connection;
+      _managedExternally = false;
 
       if (!mounted) return;
       setState(() {
         _connectionStatus = '연결됨 (${device.name ?? 'Unknown'})';
       });
+
+      // ✅ 매니저에도 등록 (대시보드 BedTile에 연결 상태 반영)
+      await _btManager.connectClassic(
+        patientCode: widget.patientCode,
+        classicDevice: device,
+      );
 
       _snack('블루투스 연결 성공');
 
@@ -769,18 +869,11 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
   }
 
   Future<void> _disconnectBluetooth() async {
-    final d = _connectedDevice;
-    if (d != null) {
-      try {
-        await d.disconnect();
-      } catch (_) {}
-    }
+    // ✅ 매니저를 통해 연결 해제 (대시보드 BedTile에도 반영)
+    await _btManager.disconnect(widget.patientCode);
 
     _classicDataSub?.cancel();
     _classicDataSub = null;
-    try {
-      _classicConnection?.finish();
-    } catch (_) {}
     _classicConnection = null;
 
     if (!mounted) return;
@@ -790,6 +883,7 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
       _notifyChar = null;
       _connectionStatus = '연결 안됨';
       _latestBleData = [];
+      _managedExternally = false;
     });
     _snack('블루투스 연결이 해제되었습니다');
   }
@@ -1240,11 +1334,20 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
     _remarkController.dispose();
     _blePostDebounce?.cancel();
     _connSub?.cancel();
-    _connectedDevice?.disconnect();
-    _classicDataSub?.cancel();
-    try {
-      _classicConnection?.finish();
-    } catch (_) {}
+    _btManagerSub?.cancel();
+
+    // ✅ 외부(대시보드)에서 연결한 경우 → 연결 유지 (매니저가 관리)
+    //    이 페이지에서 직접 연결한 경우 → 연결 해제
+    if (!_managedExternally) {
+      _connectedDevice?.disconnect();
+      _classicDataSub?.cancel();
+      try {
+        _classicConnection?.finish();
+      } catch (_) {}
+    } else {
+      // 데이터 구독만 해제, 연결 자체는 유지
+      _classicDataSub?.cancel();
+    }
     super.dispose();
   }
 }
