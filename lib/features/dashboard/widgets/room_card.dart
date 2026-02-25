@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../urlConfig.dart';
 import 'bed_tile.dart';
+import '../services/bluetooth_connection_manager.dart'; // 🚀 추가
 
 import 'dialogs/patient_add_dialog.dart';
 import '../pages/patient_detail_page.dart';
@@ -39,17 +40,17 @@ class FloorStructureRoom {
 
     return FloorStructureRoom(
       hospitalStCode:
-          int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? -1,
+      int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? -1,
       categoryName: (j['category_name']?.toString() ?? '').trim(),
       sortOrder: int.tryParse(j['sort_order']?.toString() ?? '') ?? 0,
       beds:
-          bedsList
-              .whereType<Map>()
-              .map(
-                (e) => FloorStructureBed.fromJson(Map<String, dynamic>.from(e)),
-              )
-              .toList()
-            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
+      bedsList
+          .whereType<Map>()
+          .map(
+            (e) => FloorStructureBed.fromJson(Map<String, dynamic>.from(e)),
+      )
+          .toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
     );
   }
 
@@ -75,20 +76,20 @@ class FloorStructureBed {
 
     return FloorStructureBed(
       hospitalStCode:
-          int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? -1,
+      int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? -1,
       categoryName: (j['category_name']?.toString() ?? '').trim(),
       sortOrder: int.tryParse(j['sort_order']?.toString() ?? '') ?? 0,
       patient: (pMap == null)
           ? null
           : BedPatientItem(
-              patientCode:
-                  int.tryParse(pMap['patient_code']?.toString() ?? '') ?? -1,
-              patientName: (pMap['patient_name']?.toString() ?? '').trim(),
-              patientAge:
-                  int.tryParse(pMap['patient_age']?.toString() ?? '') ?? 0,
-              patientWarning:
-                  int.tryParse(pMap['patient_warning']?.toString() ?? '') ?? 0,
-            ),
+        patientCode:
+        int.tryParse(pMap['patient_code']?.toString() ?? '') ?? -1,
+        patientName: (pMap['patient_name']?.toString() ?? '').trim(),
+        patientAge:
+        int.tryParse(pMap['patient_age']?.toString() ?? '') ?? 0,
+        patientWarning:
+        int.tryParse(pMap['patient_warning']?.toString() ?? '') ?? 0,
+      ),
     );
   }
 
@@ -207,14 +208,56 @@ class _RoomsSectionState extends State<RoomsSection> {
       final list = (roomsAny is List) ? roomsAny : const [];
 
       final parsed =
-          list
-              .whereType<Map>()
-              .map(
-                (e) =>
-                    FloorStructureRoom.fromJson(Map<String, dynamic>.from(e)),
-              )
-              .toList()
-            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      list
+          .whereType<Map>()
+          .map(
+            (e) =>
+            FloorStructureRoom.fromJson(Map<String, dynamic>.from(e)),
+      )
+          .toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+      // 🚀 BluetoothConnectionManager에 매핑 데이터 전달
+      final Map<int, int> deviceCodeMapping = {};
+      final Map<int, int> bedCodeMapping = {};
+
+      for (final room in parsed) {
+        for (final bed in room.beds) {
+          if (bed.patient != null) {
+            final patientCode = bed.patient!.patientCode;
+            // device_code는 BedPatientItem에 없으므로 원본 JSON에서 가져와야 함
+            final bedCode = bed.hospitalStCode;
+
+            if (bedCode > 0) {
+              bedCodeMapping[patientCode] = bedCode;
+            }
+          }
+        }
+      }
+
+      // 원본 JSON에서 device_code 추출
+      for (final roomJson in list.whereType<Map>()) {
+        final bedsJson = (roomJson['beds'] as List?) ?? [];
+        for (final bedJson in bedsJson.whereType<Map>()) {
+          final patientJson = bedJson['patient'] as Map?;
+          if (patientJson != null) {
+            final patientCode = int.tryParse(patientJson['patient_code']?.toString() ?? '') ?? -1;
+            final deviceCode = int.tryParse(patientJson['device_code']?.toString() ?? '') ?? 0;
+
+            if (patientCode > 0 && deviceCode > 0) {
+              deviceCodeMapping[patientCode] = deviceCode;
+            }
+          }
+        }
+      }
+
+      // BluetoothConnectionManager에 매핑 전달
+      if (deviceCodeMapping.isNotEmpty || bedCodeMapping.isNotEmpty) {
+        final btManager = BluetoothConnectionManager();
+        btManager.setPatientDeviceMapping(deviceCodeMapping);
+        btManager.setBedCodeMapping(bedCodeMapping);
+        debugPrint('[ROOM_CARD] 매핑 전달: device=$deviceCodeMapping, bed=$bedCodeMapping');
+      }
 
       setState(() {
         _rooms = parsed;
@@ -404,37 +447,37 @@ class _RoomCardState extends State<RoomCard> {
                   onInfoTap: patient == null
                       ? null
                       : () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (ctx) => PatientDetailPage(
-                                patientCode: patient.patientCode,
-                                roomLabel: room.categoryName,
-                                bedLabel: bed.categoryName,
-                                onRefresh: null,
-                              ),
-                            ),
-                          );
-                          if (widget.onRefresh != null) {
-                            await widget.onRefresh!();
-                          }
-                        },
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (ctx) => PatientDetailPage(
+                          patientCode: patient.patientCode,
+                          roomLabel: room.categoryName,
+                          bedLabel: bed.categoryName,
+                          onRefresh: null,
+                        ),
+                      ),
+                    );
+                    if (widget.onRefresh != null) {
+                      await widget.onRefresh!();
+                    }
+                  },
                   // ✅ 케어 버튼 → PatientCarePage
                   onCareTap: patient == null
                       ? null
                       : () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (ctx) => PatientCarePage(
-                                patientCode: patient.patientCode,
-                                patientName: patient.patientName,
-                                roomLabel: room.categoryName,
-                                bedLabel: bed.categoryName,
-                              ),
-                            ),
-                          );
-                        },
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (ctx) => PatientCarePage(
+                          patientCode: patient.patientCode,
+                          patientName: patient.patientName,
+                          roomLabel: room.categoryName,
+                          bedLabel: bed.categoryName,
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -443,35 +486,35 @@ class _RoomCardState extends State<RoomCard> {
     );
   }
 
-  // void _simpleInfoDialog(BuildContext context, BedPatientItem p) {
-  //   const border = Color(0xFFE5E7EB);
-  //   const text = Color(0xFF111827);
+// void _simpleInfoDialog(BuildContext context, BedPatientItem p) {
+//   const border = Color(0xFFE5E7EB);
+//   const text = Color(0xFF111827);
 
-  //   showDialog(
-  //     context: context,
-  //     builder: (ctx) => AlertDialog(
-  //       backgroundColor: Colors.white,
-  //       surfaceTintColor: Colors.white,
-  //       elevation: 0,
-  //       shape: RoundedRectangleBorder(
-  //         borderRadius: BorderRadius.circular(18),
-  //         side: const BorderSide(color: border),
-  //       ),
-  //       title: const Text(
-  //         '환자 정보',
-  //         style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: text),
-  //       ),
-  //       content: Text(
-  //         '${p.patientName} (${p.patientAge}세)\npatient_code: ${p.patientCode}',
-  //         style: const TextStyle(fontWeight: FontWeight.w700, height: 1.4, color: text),
-  //       ),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.pop(ctx),
-  //           child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.w800)),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
+//   showDialog(
+//     context: context,
+//     builder: (ctx) => AlertDialog(
+//       backgroundColor: Colors.white,
+//       surfaceTintColor: Colors.white,
+//       elevation: 0,
+//       shape: RoundedRectangleBorder(
+//         borderRadius: BorderRadius.circular(18),
+//         side: const BorderSide(color: border),
+//       ),
+//       title: const Text(
+//         '환자 정보',
+//         style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: text),
+//       ),
+//       content: Text(
+//         '${p.patientName} (${p.patientAge}세)\npatient_code: ${p.patientCode}',
+//         style: const TextStyle(fontWeight: FontWeight.w700, height: 1.4, color: text),
+//       ),
+//       actions: [
+//         TextButton(
+//           onPressed: () => Navigator.pop(ctx),
+//           child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.w800)),
+//         ),
+//       ],
+//     ),
+//   );
+// }
 }

@@ -8,54 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-// ✅ Bluetooth 추가
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
-    as classic;
-import 'package:permission_handler/permission_handler.dart';
 import '../../../../urlConfig.dart';
 import '../widgets/dialogs/patient_edit_dialog.dart';
-import '../services/bluetooth_connection_manager.dart';
-
-// ✅ BLE / Classic BT 통합 선택 결과
-enum _BtType { ble, classic }
-
-class _SelectedDevice {
-  final _BtType type;
-  final BluetoothDevice? bleDevice;
-  final classic.BluetoothDevice? classicDevice;
-
-  const _SelectedDevice.ble(this.bleDevice)
-    : type = _BtType.ble,
-      classicDevice = null;
-  const _SelectedDevice.classic(this.classicDevice)
-    : type = _BtType.classic,
-      bleDevice = null;
-
-  String get displayName {
-    if (bleDevice != null) {
-      final n = bleDevice!.platformName;
-      return n.isNotEmpty ? n : 'BLE 기기';
-    }
-    return classicDevice?.name ?? 'Classic 기기';
-  }
-}
-
-class _BlePacket {
-  final int deviceCode;
-  final double temperature;
-  final double humidity;
-  final double bodyTemperature;
-  final List<int> weights; // 4개
-
-  _BlePacket({
-    required this.deviceCode,
-    required this.temperature,
-    required this.humidity,
-    required this.bodyTemperature,
-    required this.weights,
-  });
-}
 
 class PatientDetailPage extends ConsumerStatefulWidget {
   final int patientCode;
@@ -89,41 +43,17 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
 
   PatientProfileDto? _profile; // ✅ GET /api/patient/profile 결과
 
-  // ✅ 측정값(그래프 + 상단 값)
+  // ✅ 측정값(상단 카드용 - 최신값 하나만)
   List<MeasurementBasicDto> _measurements = const [];
+
+  // 🚀 차트 데이터
+  Map<String, List<ChartDataPoint>> _chartData = {};
 
   // ✅ 명세: /api/measurement/basic?device_code=...&patient_code=...
   int _deviceCode = 1;
 
   // ✅ (추가) warning state: /api/patient/warning?patient_code=...
   int? _warningState; // 0 안전, 1 주의, 2 위험
-
-  // =========================================================
-  // ✅ Bluetooth 상태/연결 로직 (추가된 부분)
-  // =========================================================
-  BluetoothDevice? _connectedDevice;
-  BluetoothCharacteristic? _writeChar;
-  BluetoothCharacteristic? _notifyChar;
-
-  bool _isConnectingBle = false;
-  String _connectionStatus = '연결 안됨';
-  List<int> _latestBleData = [];
-
-  StreamSubscription<BluetoothConnectionState>? _connSub;
-
-  // ✅ BLE 수신값 POST 디바운스(너무 자주 POST/GET 방지)
-  Timer? _blePostDebounce;
-  bool _bleAutoPostEnabled = true;
-
-  // ✅ Classic Bluetooth (SPP) 상태
-  classic.BluetoothConnection? _classicConnection;
-  StreamSubscription? _classicDataSub;
-
-  // ✅ 외부(대시보드) 블루투스 연결 매니저 연동
-  final _btManager = BluetoothConnectionManager();
-  StreamSubscription<Map<int, PatientBluetoothConnection>>? _btManagerSub;
-  bool _managedExternally = false; // 외부에서 연결된 경우 dispose 시 연결 유지
-  // =========================================================
 
   // ✅ 비고 입력
   final TextEditingController _remarkController = TextEditingController();
@@ -134,89 +64,6 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
     super.initState();
     _front_url = Urlconfig.serverUrl.toString();
     loadData();
-
-    // ✅ 권한 요청 (추가)
-    _checkBluetoothPermissions();
-
-    // ✅ 외부(대시보드) 블루투스 연결 확인 및 동기화
-    _syncFromManager();
-    _btManagerSub = _btManager.stateStream.listen((_) {
-      if (mounted) _syncFromManager();
-    });
-  }
-
-  /// BluetoothConnectionManager에서 이 환자의 연결 상태를 동기화
-  void _syncFromManager() {
-    final conn = _btManager.getConnection(widget.patientCode);
-    if (conn != null && _connectedDevice == null && _classicConnection == null) {
-      // 외부에서 연결된 블루투스가 있고, 현재 페이지에서는 연결 안 된 상태
-      _managedExternally = true;
-      if (conn.isBLE && conn.bleDevice != null) {
-        _restoreBleFromManager(conn.bleDevice!);
-      } else if (!conn.isBLE && conn.classicConnection != null) {
-        _restoreClassicFromManager(conn);
-      }
-    } else if (conn == null && _managedExternally) {
-      // 외부에서 연결 해제됨
-      setState(() {
-        _connectedDevice = null;
-        _classicConnection = null;
-        _writeChar = null;
-        _notifyChar = null;
-        _connectionStatus = '연결 안됨';
-        _latestBleData = [];
-        _managedExternally = false;
-      });
-    }
-  }
-
-  /// 매니저의 BLE 연결을 이 페이지에서 사용할 수 있도록 복원
-  Future<void> _restoreBleFromManager(BluetoothDevice device) async {
-    try {
-      final services = await device.discoverServices();
-      final ok = await _setupCharacteristics(device, services);
-      if (!ok) return;
-
-      if (!mounted) return;
-      setState(() {
-        _connectedDevice = device;
-        _connectionStatus =
-            '연결됨 (${device.platformName.isEmpty ? 'Unknown' : device.platformName})';
-      });
-      _monitorConnection(device);
-    } catch (e) {
-      debugPrint('매니저 BLE 복원 오류: $e');
-    }
-  }
-
-  /// 매니저의 Classic 연결을 이 페이지에서 사용할 수 있도록 복원
-  void _restoreClassicFromManager(PatientBluetoothConnection conn) {
-    _classicConnection = conn.classicConnection;
-
-    if (!mounted) return;
-    setState(() {
-      _connectionStatus = '연결됨 (${conn.deviceName})';
-    });
-
-    List<int> buffer = [];
-    _classicDataSub = conn.classicConnection?.input?.listen(
-      (data) {
-        buffer.addAll(data);
-        while (buffer.length >= 8) {
-          final packet = buffer.sublist(0, 8);
-          buffer = buffer.sublist(8);
-          _handleReceivedData(packet);
-        }
-      },
-      onDone: () {
-        if (!mounted) return;
-        setState(() {
-          _connectionStatus = '연결 끊김';
-          _classicConnection = null;
-          _managedExternally = false;
-        });
-      },
-    );
   }
 
   void _snack(String msg) {
@@ -256,6 +103,7 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
     if (patientCode <= 0) {
       _profile = null;
       _measurements = const [];
+      _chartData = {};
       _warningState = null;
       return;
     }
@@ -268,7 +116,7 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
       _deviceCode = dc;
     }
 
-    // 2) 측정값 조회
+    // 2) 최신 측정값 조회 (상단 카드용)
     _measurements = await _fetchMeasurementBasic(
       deviceCode: _deviceCode,
       patientCode: patientCode,
@@ -279,13 +127,30 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
       _deviceCode = _measurements.last.deviceCode;
     }
 
-    // 3) ✅ (추가) warning 상태 조회 -> 움직임 라벨에 사용
+    // 🚀 3) 차트 데이터 조회 (그래프용)
+    try {
+      _chartData = await _fetchMeasurementChart(patientCode);
+    } catch (e) {
+      debugPrint('차트 데이터 로드 실패: $e');
+      _chartData = {}; // 빈 데이터로 폴백
+    }
+
+    // 4) ✅ (추가) warning 상태 조회 -> 움직임 라벨에 사용
     _warningState = await _fetchPatientWarningState(patientCode);
   }
 
   MeasurementBasicDto? get _latestMeasurement {
     if (_measurements.isEmpty) return null;
     return _measurements.last;
+  }
+
+  /// 🚀 차트 데이터에서 최신값 가져오기
+  String _getLatestValue(String dataType, String unit, int frac) {
+    final data = _chartData[dataType];
+    if (data == null || data.isEmpty) return '-';
+
+    final latestValue = data.last.value;
+    return '${latestValue.toStringAsFixed(frac)}$unit';
   }
 
   String _vitalValueOrDash({
@@ -376,15 +241,58 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
     final data = decoded['data'];
     if (data is! Map<String, dynamic>) throw Exception('측정값 조회 data 형식 오류');
 
-    final rawList = data['result'];
-    if (rawList is! List) throw Exception('측정값 조회 result 형식 오류');
+    // 🚀 수정: 단일 객체를 직접 처리
+    try {
+      final measurement = MeasurementBasicDto.fromJson(data);
+      return [measurement];  // 단일 항목을 리스트로 반환
+    } catch (e) {
+      throw Exception('측정값 파싱 오류: $e');
+    }
+  }
 
-    final list = rawList
-        .whereType<Map<String, dynamic>>()
-        .map(MeasurementBasicDto.fromJson)
-        .toList();
-    list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    return list;
+  /// 🚀 새로 추가: GET /api/measurement/basic/chart?patient_code=1
+  Future<Map<String, List<ChartDataPoint>>> _fetchMeasurementChart(int patientCode) async {
+    final url = _apiUrl('/api/measurement/basic/chart?patient_code=$patientCode');
+    final uri = Uri.parse(url);
+
+    debugPrint('[CHART] GET $uri');
+    final res = await http.get(uri, headers: await _headers());
+    debugPrint('[CHART] status=${res.statusCode}');
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception('차트 데이터 조회 실패(HTTP ${res.statusCode})');
+    }
+
+    final decoded = jsonDecode(res.body);
+    if (decoded is! Map<String, dynamic>) throw Exception('차트 데이터 응답 형식 오류');
+    if (decoded['code'] != 1) {
+      throw Exception((decoded['message'] ?? '차트 데이터 조회 실패').toString());
+    }
+
+    final data = decoded['data'];
+    if (data is! Map<String, dynamic>) throw Exception('차트 data 형식 오류');
+
+    // 각 타입별로 파싱
+    final result = <String, List<ChartDataPoint>>{};
+
+    // temperature 파싱
+    final tempList = (data['temperature'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    result['temperature'] = tempList.map((item) => ChartDataPoint.fromJson(item)).toList();
+
+    // humidity 파싱
+    final humList = (data['humidity'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    result['humidity'] = humList.map((item) => ChartDataPoint.fromJson(item)).toList();
+
+    // body_temperature 파싱
+    final bodyTempList = (data['body_temperature'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    result['body_temperature'] = bodyTempList.map((item) => ChartDataPoint.fromJson(item)).toList();
+
+    // 시간순 정렬
+    for (final list in result.values) {
+      list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    }
+
+    return result;
   }
 
   /// ✅ (추가) GET /api/patient/warning?patient_code=1
@@ -478,414 +386,38 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
   }
 
   // =========================
-  // ✅ 그래프 시리즈 생성
+  // 🚀 새로운 그래프 시리즈 생성
   // =========================
 
-  _ChartSeries _seriesFromMeasurements({
+  _ChartSeries _createChartSeries({
+    required String dataType, // 'temperature', 'humidity', 'body_temperature'
     required String title,
     required String unit,
     required double yMin,
     required double yMax,
     required Color lineColor,
     required Color dotColor,
-    required double Function(MeasurementBasicDto m) pick,
-
-    int windowPoints = 30,
-    Duration step = const Duration(minutes: 10),
-    int maxSource = 200,
+    bool isFullData = false, // false: 최신 10개, true: 전체
   }) {
-    final sorted = [..._measurements]
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final chartPoints = _chartData[dataType] ?? [];
 
-    if (sorted.isEmpty) {
-      return _ChartSeries(
-        title: title,
-        unit: unit,
-        points: const <_ChartPoint>[],
-        yMin: yMin,
-        yMax: yMax,
-        lineColor: lineColor,
-        dotColor: dotColor,
-        selectedDotColor: const Color(0xFF34D399),
-      );
-    }
+    // 최신 10개 vs 전체 선택
+    final selectedPoints = isFullData
+        ? chartPoints
+        : (chartPoints.length > 10 ? chartPoints.sublist(chartPoints.length - 10) : chartPoints);
 
-    final src = sorted.length > maxSource
-        ? sorted.sublist(sorted.length - maxSource)
-        : sorted;
-
-    final stepMs = step.inMilliseconds;
-
-    DateTime floorToStep(DateTime d) {
-      final minutes = step.inMinutes;
-      if (minutes <= 0) return d;
-      final m = (d.minute ~/ minutes) * minutes;
-      return DateTime(d.year, d.month, d.day, d.hour, m);
-    }
-
-    final end = floorToStep(src.last.createdAt);
-    final start = end.subtract(step * (windowPoints - 1));
-
-    final bucket = <int, double>{};
-    for (final m in src) {
-      final t = floorToStep(m.createdAt);
-      final key = t.millisecondsSinceEpoch ~/ stepMs;
-      bucket[key] = pick(m);
-    }
-
-    double cur = pick(src.first);
-    for (final m in src) {
-      if (m.createdAt.isBefore(start) || m.createdAt.isAtSameMomentAs(start)) {
-        cur = pick(m);
-      } else {
-        break;
-      }
-    }
-
-    final pts = <_ChartPoint>[];
-    for (int i = 0; i < windowPoints; i++) {
-      final t = start.add(step * i);
-      final key = t.millisecondsSinceEpoch ~/ stepMs;
-      if (bucket.containsKey(key)) cur = bucket[key]!;
-      final v = cur.clamp(yMin, yMax).toDouble();
-      pts.add(_ChartPoint(t, v));
-    }
+    final points = selectedPoints.map((cp) => _ChartPoint(cp.timestamp, cp.value)).toList();
 
     return _ChartSeries(
       title: title,
       unit: unit,
-      points: pts,
+      points: points,
       yMin: yMin,
       yMax: yMax,
       lineColor: lineColor,
       dotColor: dotColor,
       selectedDotColor: const Color(0xFF34D399),
     );
-  }
-
-  // =========================
-  // ✅ Bluetooth
-  // =========================
-
-  Future<void> _checkBluetoothPermissions() async {
-    if (await Permission.bluetoothScan.isDenied) {
-      await Permission.bluetoothScan.request();
-    }
-    if (await Permission.bluetoothConnect.isDenied) {
-      await Permission.bluetoothConnect.request();
-    }
-    if (await Permission.location.isDenied) {
-      await Permission.location.request();
-    }
-  }
-
-  bool get _isAnyConnected =>
-      _connectedDevice != null || _classicConnection != null;
-
-  Future<void> _onBleButtonPressed() async {
-    if (_isConnectingBle) return;
-
-    if (!_isAnyConnected) {
-      await _connectBluetooth();
-    } else {
-      await _disconnectBluetooth();
-    }
-  }
-
-  Future<void> _connectBluetooth() async {
-    setState(() => _isConnectingBle = true);
-
-    try {
-      final _SelectedDevice? selected = await _showScanningDialog();
-      if (selected == null) return;
-
-      if (selected.type == _BtType.ble && selected.bleDevice != null) {
-        await _connectToDevice(selected.bleDevice!);
-      } else if (selected.type == _BtType.classic &&
-          selected.classicDevice != null) {
-        await _connectToClassicDevice(selected.classicDevice!);
-      }
-    } catch (e) {
-      _snack('블루투스 연결 실패: $e');
-      debugPrint('블루투스 연결 오류: $e');
-    } finally {
-      if (mounted) setState(() => _isConnectingBle = false);
-    }
-  }
-
-  Future<_SelectedDevice?> _showScanningDialog() async {
-    return showDialog<_SelectedDevice>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _ScanningDialog(),
-    );
-  }
-
-  Future<void> _connectToDevice(BluetoothDevice device) async {
-    try {
-      _snack('${device.name.isEmpty ? '기기' : device.name}에 연결 중...');
-
-      try {
-        await device.connect(timeout: const Duration(seconds: 10));
-      } catch (_) {}
-
-      final services = await device.discoverServices();
-      final ok = await _setupCharacteristics(device, services);
-
-      if (!ok) {
-        await device.disconnect();
-        _snack('서비스/특성 설정 실패');
-        return;
-      }
-
-      setState(() {
-        _connectedDevice = device;
-        _managedExternally = false;
-        _connectionStatus =
-            '연결됨 (${device.name.isEmpty ? 'Unknown' : device.name})';
-      });
-
-      // ✅ 매니저에도 등록 (대시보드 BedTile에 연결 상태 반영)
-      await _btManager.connectBLE(
-        patientCode: widget.patientCode,
-        device: device,
-      );
-
-      _snack('블루투스 연결 성공');
-
-      _monitorConnection(device);
-    } catch (e) {
-      _snack('연결 실패: $e');
-      debugPrint('기기 연결 오류: $e');
-    }
-  }
-
-  Future<void> _connectToClassicDevice(classic.BluetoothDevice device) async {
-    try {
-      _snack('${device.name ?? '기기'}에 연결 중...');
-
-      final connection = await classic.BluetoothConnection.toAddress(
-        device.address,
-      );
-
-      _classicConnection = connection;
-      _managedExternally = false;
-
-      if (!mounted) return;
-      setState(() {
-        _connectionStatus = '연결됨 (${device.name ?? 'Unknown'})';
-      });
-
-      // ✅ 매니저에도 등록 (대시보드 BedTile에 연결 상태 반영)
-      await _btManager.connectClassic(
-        patientCode: widget.patientCode,
-        classicDevice: device,
-      );
-
-      _snack('블루투스 연결 성공');
-
-      List<int> buffer = [];
-      _classicDataSub = connection.input?.listen(
-        (data) {
-          buffer.addAll(data);
-          while (buffer.length >= 8) {
-            final packet = buffer.sublist(0, 8);
-            buffer = buffer.sublist(8);
-            _handleReceivedData(packet);
-          }
-        },
-        onDone: () {
-          if (!mounted) return;
-          setState(() {
-            _classicConnection = null;
-            _connectionStatus = '연결 끊김';
-          });
-        },
-        onError: (e) {
-          debugPrint('Classic BT 수신 오류: $e');
-        },
-      );
-    } catch (e) {
-      _snack('연결 실패: $e');
-      debugPrint('Classic BT 연결 오류: $e');
-    }
-  }
-
-  Future<bool> _setupCharacteristics(
-    BluetoothDevice device,
-    List<BluetoothService> services,
-  ) async {
-    try {
-      BluetoothCharacteristic? writeChar;
-      BluetoothCharacteristic? notifyChar;
-
-      for (final s in services) {
-        for (final c in s.characteristics) {
-          if (c.properties.write && writeChar == null) {
-            writeChar = c;
-          }
-          if (c.properties.notify && notifyChar == null) {
-            notifyChar = c;
-            await c.setNotifyValue(true);
-
-            c.value.listen((data) {
-              _handleReceivedData(data);
-            });
-          }
-        }
-      }
-
-      debugPrint('쓰기 특성: ${writeChar?.uuid}');
-      debugPrint('알림 특성: ${notifyChar?.uuid}');
-
-      _writeChar = writeChar;
-      _notifyChar = notifyChar;
-
-      return writeChar != null || notifyChar != null;
-    } catch (e) {
-      debugPrint('특성 설정 오류: $e');
-      return false;
-    }
-  }
-
-  _BlePacket? _parseBlePacket(List<int> data) {
-    if (data.length < 8) return null;
-
-    int u8(int i) => data[i] & 0xFF;
-
-    final dc = u8(0);
-
-    const tempScale = 1.0;
-    const bodyTempScale = 1.0;
-    const humScale = 1.0;
-
-    final temp = u8(1) / tempScale;
-    final hum = u8(2) / humScale;
-    final bodyTemp = u8(3) / bodyTempScale;
-
-    final w1 = u8(4);
-    final w2 = u8(5);
-    final w3 = u8(6);
-    final w4 = u8(7);
-
-    return _BlePacket(
-      deviceCode: dc,
-      temperature: temp.toDouble(),
-      humidity: hum.toDouble(),
-      bodyTemperature: bodyTemp.toDouble(),
-      weights: [w1, w2, w3, w4],
-    );
-  }
-
-  Future<void> _postMeasurementFromBle(_BlePacket p) async {
-    final url = _apiUrl('/api/measurement/basic');
-    final uri = Uri.parse(url);
-
-    final body = {
-      "device_code": p.deviceCode,
-      "measurements": [
-        {
-          "temperature": p.temperature,
-          "body_temperature": p.bodyTemperature,
-          "humidity": p.humidity,
-          "weights": [
-            {"sensor": 1, "value": p.weights[0]},
-            {"sensor": 2, "value": p.weights[1]},
-            {"sensor": 3, "value": p.weights[2]},
-            {"sensor": 4, "value": p.weights[3]},
-          ],
-        },
-      ],
-    };
-
-    debugPrint('[MEASUREMENT][POST] $uri');
-    debugPrint('[MEASUREMENT][POST BODY] ${jsonEncode(body)}');
-
-    final res = await http.post(
-      uri,
-      headers: await _headers(),
-      body: jsonEncode(body),
-    );
-    debugPrint('[MEASUREMENT][POST] status=${res.statusCode} body=${res.body}');
-
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('측정값 저장 실패(HTTP ${res.statusCode})');
-    }
-
-    final decoded = jsonDecode(res.body);
-    if (decoded is! Map<String, dynamic>) throw Exception('측정값 저장 응답 형식 오류');
-    if (decoded['code'] != 1)
-      throw Exception((decoded['message'] ?? '측정값 저장 실패').toString());
-  }
-
-  void _handleReceivedData(List<int> data) {
-    if (!mounted) return;
-    setState(() => _latestBleData = data);
-
-    debugPrint('=== BLE 수신 ===');
-    debugPrint('bytes: $data / len=${data.length}');
-    final hex = data
-        .map((b) => (b & 0xFF).toRadixString(16).padLeft(2, '0'))
-        .join(' ');
-    debugPrint('hex: $hex');
-
-    final pkt = _parseBlePacket(data);
-    if (pkt == null) {
-      debugPrint('BLE packet too short. need >= 8');
-      return;
-    }
-
-    _deviceCode = pkt.deviceCode;
-
-    if (_bleAutoPostEnabled) {
-      _blePostDebounce?.cancel();
-      _blePostDebounce = Timer(const Duration(milliseconds: 600), () async {
-        try {
-          await _postMeasurementFromBle(pkt);
-          if (mounted) await loadData();
-        } catch (e) {
-          debugPrint('BLE→POST 실패: $e');
-        }
-      });
-    }
-  }
-
-  void _monitorConnection(BluetoothDevice device) {
-    _connSub?.cancel();
-    _connSub = device.connectionState.listen((state) {
-      if (!mounted) return;
-      setState(() {
-        if (state == BluetoothConnectionState.connected) {
-          _connectionStatus =
-              '연결됨 (${device.name.isEmpty ? 'Unknown' : device.name})';
-        } else {
-          _connectionStatus = '연결 끊김';
-          _connectedDevice = null;
-          _writeChar = null;
-          _notifyChar = null;
-        }
-      });
-    });
-  }
-
-  Future<void> _disconnectBluetooth() async {
-    // ✅ 매니저를 통해 연결 해제 (대시보드 BedTile에도 반영)
-    await _btManager.disconnect(widget.patientCode);
-
-    _classicDataSub?.cancel();
-    _classicDataSub = null;
-    _classicConnection = null;
-
-    if (!mounted) return;
-    setState(() {
-      _connectedDevice = null;
-      _writeChar = null;
-      _notifyChar = null;
-      _connectionStatus = '연결 안됨';
-      _latestBleData = [];
-      _managedExternally = false;
-    });
-    _snack('블루투스 연결이 해제되었습니다');
   }
 
   // =========================
@@ -1012,21 +544,10 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
     final p = _ui;
     final latest = _latestMeasurement;
 
-    final bodyTempText = _vitalValueOrDash(
-      value: latest?.bodyTemperature,
-      unit: '°C',
-      frac: 1,
-    );
-    final roomTempText = _vitalValueOrDash(
-      value: latest?.temperature,
-      unit: ' °C',
-      frac: 1,
-    );
-    final humidText = _vitalValueOrDash(
-      value: latest?.humidity,
-      unit: '%',
-      frac: 0,
-    );
+    // 🚀 차트 데이터에서 최신값 가져오기 (measurements 대신)
+    final bodyTempText = _getLatestValue('body_temperature', '°C', 1);
+    final roomTempText = _getLatestValue('temperature', ' °C', 1);
+    final humidText = _getLatestValue('humidity', '%', 0);
 
     final ws = _warningState;
     final movementText = switch (ws) {
@@ -1042,74 +563,69 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
       _ => const Color(0xFF111827),
     };
 
-    final bodyTempSeries = _seriesFromMeasurements(
+    final hasChartData = _chartData.isNotEmpty;
+
+    // 🚀 새로운 차트 시리즈 생성 (최신 10개)
+    final bodyTempSeries = hasChartData ? _createChartSeries(
+      dataType: 'body_temperature',
       title: '체온',
       unit: '°C',
-      yMin: 35,
-      yMax: 40,
+      yMin: 35, yMax: 40,
       lineColor: const Color(0xFFEF4444),
       dotColor: const Color(0xFFB91C1C),
-      pick: (m) => m.bodyTemperature,
-    );
+      isFullData: false,
+    ) : _emptyChartSeries('체온', '°C', 35, 40, const Color(0xFFEF4444));
 
-    final roomTempSeries = _seriesFromMeasurements(
+    final roomTempSeries = hasChartData ? _createChartSeries(
+      dataType: 'temperature',
       title: '병실온도',
       unit: '°C',
-      yMin: 16,
-      yMax: 32,
+      yMin: 16, yMax: 32,
       lineColor: const Color(0xFF06B6D4),
       dotColor: const Color(0xFF0284C7),
-      pick: (m) => m.temperature,
-    );
+      isFullData: false,
+    ) : _emptyChartSeries('병실온도', '°C', 16, 32, const Color(0xFF06B6D4));
 
-    final humiditySeries = _seriesFromMeasurements(
+    final humiditySeries = hasChartData ? _createChartSeries(
+      dataType: 'humidity',
       title: '습도',
       unit: '%',
-      yMin: 0,
-      yMax: 100,
+      yMin: 0, yMax: 100,
       lineColor: const Color(0xFF3B82F6),
       dotColor: const Color(0xFF1D4ED8),
-      pick: (m) => m.humidity,
-    );
+      isFullData: false,
+    ) : _emptyChartSeries('습도', '%', 0, 100, const Color(0xFF3B82F6));
 
-    final bodyTempSeriesFull = _seriesFromMeasurements(
+    // 🚀 확대용 차트 시리즈 (전체 데이터)
+    final bodyTempSeriesFull = hasChartData ? _createChartSeries(
+      dataType: 'body_temperature',
       title: '체온',
       unit: '°C',
-      yMin: 35,
-      yMax: 40,
+      yMin: 35, yMax: 40,
       lineColor: const Color(0xFFEF4444),
       dotColor: const Color(0xFFB91C1C),
-      pick: (m) => m.bodyTemperature,
-      windowPoints: 180,
-      step: const Duration(minutes: 10),
-      maxSource: 3000,
-    );
+      isFullData: true,
+    ) : _emptyChartSeries('체온', '°C', 35, 40, const Color(0xFFEF4444));
 
-    final roomTempSeriesFull = _seriesFromMeasurements(
+    final roomTempSeriesFull = hasChartData ? _createChartSeries(
+      dataType: 'temperature',
       title: '병실온도',
       unit: '°C',
-      yMin: 16,
-      yMax: 32,
+      yMin: 16, yMax: 32,
       lineColor: const Color(0xFF06B6D4),
       dotColor: const Color(0xFF0284C7),
-      pick: (m) => m.temperature,
-      windowPoints: 180,
-      step: const Duration(minutes: 10),
-      maxSource: 3000,
-    );
+      isFullData: true,
+    ) : _emptyChartSeries('병실온도', '°C', 16, 32, const Color(0xFF06B6D4));
 
-    final humiditySeriesFull = _seriesFromMeasurements(
+    final humiditySeriesFull = hasChartData ? _createChartSeries(
+      dataType: 'humidity',
       title: '습도',
       unit: '%',
-      yMin: 0,
-      yMax: 100,
+      yMin: 0, yMax: 100,
       lineColor: const Color(0xFF3B82F6),
       dotColor: const Color(0xFF1D4ED8),
-      pick: (m) => m.humidity,
-      windowPoints: 180,
-      step: const Duration(minutes: 10),
-      maxSource: 3000,
-    );
+      isFullData: true,
+    ) : _emptyChartSeries('습도', '%', 0, 100, const Color(0xFF3B82F6));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
@@ -1129,41 +645,6 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: !_isAnyConnected
-                  ? const Color.fromARGB(255, 96, 134, 218)
-                  : const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            ),
-            onPressed: _isConnectingBle ? null : _onBleButtonPressed,
-            icon: _isConnectingBle
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Icon(
-                    _isAnyConnected
-                        ? Icons.bluetooth_connected
-                        : Icons.bluetooth_disabled,
-                  ),
-            label: Text(
-              _isConnectingBle
-                  ? '연결 중...'
-                  : (!_isAnyConnected ? '연결' : '연결 해제'),
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ),
-          const SizedBox(width: 10),
           OutlinedButton(
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFFEF4444),
@@ -1215,16 +696,6 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
                 const SizedBox(width: 18),
                 Expanded(child: _InfoCardMedical(p: p)),
               ],
-            ),
-
-            // BLE 연결 상태 텍스트
-            const SizedBox(height: 12),
-            Text(
-              '블루투스: $_connectionStatus${_latestBleData.isNotEmpty ? ' · 최신데이터 ${_latestBleData.length}B' : ''}',
-              style: const TextStyle(
-                color: Color(0xFF6B7280),
-                fontWeight: FontWeight.w800,
-              ),
             ),
 
             const SizedBox(height: 22),
@@ -1323,31 +794,30 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
                 ),
               ],
             ),
+            SizedBox(height: 50,)
           ],
         ),
       ),
     );
   }
 
+  /// 🚀 빈 차트 시리즈 생성 (차트 데이터 없을 때 사용)
+  _ChartSeries _emptyChartSeries(String title, String unit, double yMin, double yMax, Color color) {
+    return _ChartSeries(
+      title: title,
+      unit: unit,
+      points: [],
+      yMin: yMin,
+      yMax: yMax,
+      lineColor: color,
+      dotColor: color,
+      selectedDotColor: color,
+    );
+  }
+
   @override
   void dispose() {
     _remarkController.dispose();
-    _blePostDebounce?.cancel();
-    _connSub?.cancel();
-    _btManagerSub?.cancel();
-
-    // ✅ 외부(대시보드)에서 연결한 경우 → 연결 유지 (매니저가 관리)
-    //    이 페이지에서 직접 연결한 경우 → 연결 해제
-    if (!_managedExternally) {
-      _connectedDevice?.disconnect();
-      _classicDataSub?.cancel();
-      try {
-        _classicConnection?.finish();
-      } catch (_) {}
-    } else {
-      // 데이터 구독만 해제, 연결 자체는 유지
-      _classicDataSub?.cancel();
-    }
     super.dispose();
   }
 }
@@ -1452,6 +922,56 @@ class MeasurementBasicDto {
       createdAt: parsed,
       warningState: j['warning_state'] == null ? null : _i(j['warning_state']),
     );
+  }
+}
+
+// 🚀 차트 데이터 포인트 모델
+class ChartDataPoint {
+  final double value;
+  final DateTime timestamp;
+
+  const ChartDataPoint({
+    required this.value,
+    required this.timestamp,
+  });
+
+  factory ChartDataPoint.fromJson(Map<String, dynamic> json) {
+    final value = double.tryParse(json['value']?.toString() ?? '') ?? 0.0;
+    final timestampStr = json['timestamp']?.toString() ?? '';
+
+    DateTime timestamp;
+    try {
+      // "20260109T15:04" -> "2026-01-09T15:04:00"
+      if (timestampStr.length >= 13 && timestampStr.contains('T')) {
+        final parts = timestampStr.split('T');
+        if (parts.length == 2) {
+          final datePart = parts[0]; // "20260109"
+          final timePart = parts[1]; // "1504"
+
+          if (datePart.length >= 8 && timePart.length >= 4) {
+            final year = datePart.substring(0, 4);
+            final month = datePart.substring(4, 6);
+            final day = datePart.substring(6, 8);
+            final hour = timePart.substring(0, 2);
+            final minute = timePart.substring(2, 4);
+
+            final isoString = '$year-$month-${day}T$hour:$minute:00';
+            timestamp = DateTime.parse(isoString);
+          } else {
+            timestamp = DateTime.now();
+          }
+        } else {
+          timestamp = DateTime.now();
+        }
+      } else {
+        timestamp = DateTime.now();
+      }
+    } catch (e) {
+      debugPrint('Timestamp 파싱 오류: $timestampStr -> $e');
+      timestamp = DateTime.now();
+    }
+
+    return ChartDataPoint(value: value, timestamp: timestamp);
   }
 }
 
@@ -1932,7 +1452,8 @@ class _LineChartPainter extends CustomPainter {
       for (int i = 0; i < n; i += step) {
         final x = plot.left + plot.width * (i / (n - 1));
         final d = series.points[i].t;
-        final label = '${_fmt2(d.hour)}:${_fmt2(d.minute)}';
+        // 🚀 MM/DD HH:mm 형식으로 변경
+        final label = '${_fmt2(d.month)}/${_fmt2(d.day)} ${_fmt2(d.hour)}:${_fmt2(d.minute)}';
 
         tp.text = TextSpan(
           text: label,
@@ -1965,14 +1486,11 @@ class _LineChartPainter extends CustomPainter {
       final p0 = ptToXY(0);
       path.moveTo(p0.dx, p0.dy);
 
-      for (int i = 1; i < n - 1; i++) {
-        final p1 = ptToXY(i);
-        final p2 = ptToXY(i + 1);
-        final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
-        path.quadraticBezierTo(p1.dx, p1.dy, mid.dx, mid.dy);
+      // 🚀 직선 연결로 변경 (곡선 제거)
+      for (int i = 1; i < n; i++) {
+        final p = ptToXY(i);
+        path.lineTo(p.dx, p.dy);
       }
-      final pn = ptToXY(n - 1);
-      path.lineTo(pn.dx, pn.dy);
 
       canvas.drawPath(
         path,
@@ -2009,7 +1527,7 @@ class _LineChartPainter extends CustomPainter {
       final v = series.points[idx].v;
 
       final line1 = _fmtDateTime(t);
-      final line2 = '${series.title}:${_fmtNum(v)}${series.unit}';
+      final line2 = '${series.title}: ${_fmtNum(v)}${series.unit}';
 
       final textStyle = const TextStyle(
         color: Colors.white,
@@ -2053,93 +1571,95 @@ class _LineChartPainter extends CustomPainter {
   }
 }
 
+// 🚀 확대 차트 화면 크기 자동 조절
 void _showChartFullScreen(
-  BuildContext context, {
-  required String title,
-  required _ChartSeries series,
-}) {
+    BuildContext context, {
+      required String title,
+      required _ChartSeries series,
+    }) {
   showDialog(
     context: context,
     barrierColor: const Color(0x99000000),
     builder: (ctx) {
-      final w = max(1100.0, series.points.length * 18.0 + 120.0);
-
       return Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: Container(
-          width: 1100,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9FAFB),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1A000000),
-                blurRadius: 18,
-                offset: Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
+        child: LayoutBuilder(
+            builder: (context, constraints) {
+              // 🚀 화면 크기에 맞춰서 자동 조절
+              final dialogWidth = constraints.maxWidth - 32;
+              final chartWidth = dialogWidth - 36; // padding 고려
+
+              return Container(
+                width: dialogWidth,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1A000000),
+                      blurRadius: 18,
+                      offset: Offset(0, 10),
                     ),
-                  ),
-                  const Spacer(),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF374151),
-                      side: const BorderSide(color: Color(0xFFE5E7EB)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const Spacer(),
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF374151),
+                            side: const BorderSide(color: Color(0xFFE5E7EB)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text(
+                            '닫기',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ],
                     ),
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text(
-                      '닫기',
-                      style: TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 520,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SizedBox(
-                      width: w,
+                    const SizedBox(height: 12),
+                    // 🚀 스크롤 제거, 화면에 맞춰서 표시
+                    SizedBox(
                       height: 520,
-                      child: _InteractiveLineChart(series: series),
+                      width: chartWidth,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: _InteractiveLineChart(series: series),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      '점을 터치하면 상세 정보가 표시됩니다.',
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                '점을 터치 하면 상세 정보가 표시됩니다.',
-                style: TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
+              );
+            }
         ),
       );
     },
@@ -2155,603 +1675,4 @@ String _fmt2(int n) => n.toString().padLeft(2, '0');
 
 String _fmtDateTime(DateTime t) {
   return '${t.year}-${_fmt2(t.month)}-${_fmt2(t.day)} ${_fmt2(t.hour)}:${_fmt2(t.minute)}:${_fmt2(t.second)}';
-}
-
-// =========================================================
-// ✅ BLE + Classic BT 통합 스캔 다이얼로그
-// =========================================================
-
-class _ScannedItem {
-  final _BtType type;
-  final String name;
-  final String address;
-  final int rssi;
-  final BluetoothDevice? bleDevice;
-  final classic.BluetoothDevice? classicDevice;
-
-  const _ScannedItem({
-    required this.type,
-    required this.name,
-    required this.address,
-    required this.rssi,
-    this.bleDevice,
-    this.classicDevice,
-  });
-
-  bool get hasName => name.isNotEmpty && !name.startsWith('알 수 없는');
-}
-
-class _ScanningDialog extends StatefulWidget {
-  @override
-  _ScanningDialogState createState() => _ScanningDialogState();
-}
-
-class _ScanningDialogState extends State<_ScanningDialog> {
-  final List<_ScannedItem> _items = [];
-  bool _isScanning = true;
-
-  static const _cBg = Color(0xFFFAFAFA);
-  static const _cCard = Colors.white;
-  static const _cBorder = Color(0xFFE5E7EB);
-  static const _cText = Color(0xFF111827);
-  static const _cSub = Color(0xFF6B7280);
-  static const _cGreen = Color(0xFF22C55E);
-  static const _cBlue = Color(0xFF3B82F6);
-
-  StreamSubscription<List<ScanResult>>? _bleScanSub;
-  StreamSubscription<classic.BluetoothDiscoveryResult>? _classicScanSub;
-
-  @override
-  void initState() {
-    super.initState();
-    _startScanning();
-  }
-
-  @override
-  void dispose() {
-    _bleScanSub?.cancel();
-    _classicScanSub?.cancel();
-    FlutterBluePlus.stopScan();
-    super.dispose();
-  }
-
-  Future<void> _startScanning() async {
-    setState(() {
-      _isScanning = true;
-      _items.clear();
-    });
-
-    try {
-      final bonded = await classic.FlutterBluetoothSerial.instance
-          .getBondedDevices();
-      debugPrint('[CLASSIC] bonded devices: ${bonded.length}');
-      if (mounted) {
-        setState(() {
-          for (final d in bonded) {
-            final addr = d.address;
-            if (addr.isEmpty) continue;
-            final deviceName = d.name;
-            _items.add(
-              _ScannedItem(
-                type: _BtType.classic,
-                name: (deviceName == null || deviceName.isEmpty)
-                    ? '페어링된 기기'
-                    : '$deviceName (페어링됨)',
-                address: addr,
-                rssi: 0,
-                classicDevice: d,
-              ),
-            );
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('[CLASSIC BONDED] error: $e');
-    }
-
-    _bleScanSub?.cancel();
-    _bleScanSub = FlutterBluePlus.scanResults.listen((results) {
-      if (!mounted) return;
-      setState(() {
-        for (final r in results) {
-          final advName = r.advertisementData.advName;
-          final platName = r.device.platformName;
-          final name = advName.isNotEmpty
-              ? advName
-              : (platName.isNotEmpty ? platName : '');
-
-          if (name.isEmpty) continue;
-
-          final addr = r.device.remoteId.str;
-          final idx = _items.indexWhere((i) => i.address == addr);
-
-          final item = _ScannedItem(
-            type: _BtType.ble,
-            name: name,
-            address: addr,
-            rssi: r.rssi,
-            bleDevice: r.device,
-          );
-
-          if (idx >= 0) {
-            _items[idx] = item;
-          } else {
-            _items.add(item);
-          }
-        }
-        _sortItems();
-      });
-    });
-
-    try {
-      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
-    } catch (e) {
-      debugPrint('[BLE SCAN] error: $e');
-    }
-
-    _classicScanSub?.cancel();
-    try {
-      debugPrint('[CLASSIC] starting discovery...');
-      _classicScanSub = classic.FlutterBluetoothSerial.instance
-          .startDiscovery()
-          .listen(
-            (r) {
-              if (!mounted) return;
-              debugPrint(
-                '[CLASSIC] found: ${r.device.name} / ${r.device.address}',
-              );
-              setState(() {
-                final addr = r.device.address;
-                if (addr.isEmpty) return;
-
-                final idx = _items.indexWhere((i) => i.address == addr);
-                final deviceName = r.device.name;
-                final item = _ScannedItem(
-                  type: _BtType.classic,
-                  name: (deviceName == null || deviceName.isEmpty)
-                      ? '알 수 없는 기기'
-                      : deviceName,
-                  address: addr,
-                  rssi: r.rssi,
-                  classicDevice: r.device,
-                );
-
-                if (idx >= 0) {
-                  _items[idx] = item;
-                } else {
-                  _items.add(item);
-                }
-                _sortItems();
-              });
-            },
-            onError: (e) {
-              debugPrint('[CLASSIC DISCOVERY] stream error: $e');
-            },
-            onDone: () {
-              debugPrint('[CLASSIC DISCOVERY] done');
-            },
-          );
-    } catch (e) {
-      debugPrint('[CLASSIC SCAN] error: $e');
-    }
-
-    await Future.delayed(const Duration(seconds: 12));
-    if (mounted) setState(() => _isScanning = false);
-  }
-
-  void _sortItems() {
-    _items.sort((a, b) {
-      if (a.hasName && !b.hasName) return -1;
-      if (!a.hasName && b.hasName) return 1;
-      return b.rssi.compareTo(a.rssi);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Container(
-        width: 560,
-        decoration: BoxDecoration(
-          color: _cBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _cBorder, width: 1),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x14000000),
-              blurRadius: 18,
-              offset: Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 12, 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _cGreen.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: _cBorder),
-                    ),
-                    child: const Icon(
-                      Icons.bluetooth_searching,
-                      color: _cGreen,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      '블루투스 기기 선택',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: _cText,
-                      ),
-                    ),
-                  ),
-                  if (_isScanning)
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: '닫기',
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: _cSub),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: _cBorder),
-
-            // Body
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-              child: Column(
-                children: [
-                  // 상태 배너
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: _cBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: _cGreen.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: _cBorder),
-                          ),
-                          child: Icon(
-                            _isScanning ? Icons.search : Icons.check_circle,
-                            size: 16,
-                            color: _cGreen,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _isScanning
-                                ? '검색 중입니다...  (${_items.length}개 발견)'
-                                : '검색 완료  (${_items.length}개)',
-                            style: const TextStyle(
-                              color: _cText,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        if (!_isScanning)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _cGreen,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: const Text(
-                              '완료',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFCD34D)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: Color(0xFFB45309),
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '기기가 안 보이면 태블릿 설정 → 블루투스에서 먼저 페어링하세요',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFB45309),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Container(
-                    height: 420,
-                    decoration: BoxDecoration(
-                      color: _cCard,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: _cBorder),
-                    ),
-                    child: _items.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24.0),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    _isScanning
-                                        ? Icons.bluetooth_searching
-                                        : Icons.bluetooth_disabled,
-                                    size: 44,
-                                    color: const Color(0xFF9CA3AF),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    _isScanning
-                                        ? '기기를 검색하고 있습니다...'
-                                        : '발견된 기기가 없습니다',
-                                    style: const TextStyle(
-                                      color: _cSub,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    '기기 전원이 켜져있는지, 블루투스 기기를 확인해 주세요.',
-                                    style: TextStyle(
-                                      color: _cSub,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.all(12),
-                            itemCount: _items.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              final item = _items[index];
-                              final isBle = item.type == _BtType.ble;
-                              final typeLabel = isBle ? 'BLE' : 'Classic';
-                              final typeColor = isBle ? _cBlue : _cGreen;
-
-                              return InkWell(
-                                onTap: () {
-                                  final selected = isBle
-                                      ? _SelectedDevice.ble(item.bleDevice)
-                                      : _SelectedDevice.classic(
-                                          item.classicDevice,
-                                        );
-                                  Navigator.of(context).pop(selected);
-                                },
-                                borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  padding: const EdgeInsets.all(14),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFFFFF),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: _cBorder),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 44,
-                                        height: 44,
-                                        decoration: BoxDecoration(
-                                          color: typeColor.withOpacity(0.10),
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                          border: Border.all(color: _cBorder),
-                                        ),
-                                        child: Icon(
-                                          Icons.bluetooth,
-                                          color: typeColor,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Flexible(
-                                                  child: Text(
-                                                    item.name,
-                                                    style: const TextStyle(
-                                                      fontSize: 15,
-                                                      fontWeight:
-                                                          FontWeight.w900,
-                                                      color: _cText,
-                                                    ),
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: typeColor
-                                                        .withOpacity(0.12),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          6,
-                                                        ),
-                                                  ),
-                                                  child: Text(
-                                                    typeLabel,
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      color: typeColor,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'MAC  ${item.address}  ·  신호 ${item.rssi}dBm',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w700,
-                                                color: _cSub,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _cGreen,
-                                          borderRadius: BorderRadius.circular(
-                                            999,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          '선택',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            ),
-
-            const Divider(height: 1, color: _cBorder),
-
-            // Footer Buttons
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
-              child: Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _isScanning ? null : _startScanning,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _cText,
-                      side: const BorderSide(color: _cBorder),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                    ),
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text(
-                      '다시 검색',
-                      style: TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                  const Spacer(),
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF374151),
-                      side: const BorderSide(color: _cBorder),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 12,
-                      ),
-                    ),
-                    child: const Text(
-                      '취소',
-                      style: TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

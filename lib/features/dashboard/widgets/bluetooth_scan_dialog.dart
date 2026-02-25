@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as ble;
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
-    as classic;
+as classic;
 import '../services/bluetooth_connection_manager.dart';
 
 /// 블루투스 디바이스 스캔 및 연결 다이얼로그
@@ -27,7 +27,7 @@ class _BluetoothScanDialogState extends State<BluetoothScanDialog>
 
   bool _isScanning = false;
   List<ble.ScanResult> _bleDevices = [];
-  List<classic.BluetoothDiscoveryResult> _classicDevices = [];
+  List<classic.BluetoothDevice> _classicDevices = [];
   String? _errorMessage;
 
   @override
@@ -52,15 +52,13 @@ class _BluetoothScanDialogState extends State<BluetoothScanDialog>
     });
 
     try {
-      // BLE와 Classic 동시 스캔
-      final futures = await Future.wait([
-        _btManager.scanBLEDevices(),
-        _btManager.scanClassicDevices(),
-      ]);
+      // 각각 호출하여 타입을 확실히 보장받습니다.
+      final bleResults = await _btManager.scanBLEDevices();
+      final classicResults = await _btManager.scanClassicDevices();
 
       setState(() {
-        _bleDevices = futures[0] as List<ble.ScanResult>;
-        _classicDevices = futures[1] as List<classic.BluetoothDiscoveryResult>;
+        _bleDevices = bleResults;
+        _classicDevices = classicResults;
         _isScanning = false;
       });
     } catch (e) {
@@ -188,10 +186,10 @@ class _BluetoothScanDialogState extends State<BluetoothScanDialog>
           onPressed: _isScanning ? null : _startScan,
           icon: _isScanning
               ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
               : const Icon(Icons.refresh),
           label: Text(_isScanning ? '스캔 중...' : '다시 스캔'),
         ),
@@ -259,13 +257,13 @@ class _BluetoothScanDialogState extends State<BluetoothScanDialog>
           trailing: _isScanning
               ? null
               : ElevatedButton(
-                  onPressed: () => _connectBLE(device),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3B82F6),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('연결'),
-                ),
+            onPressed: () => _connectBLE(device),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3B82F6),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('연결'),
+          ),
         );
       },
     );
@@ -311,10 +309,8 @@ class _BluetoothScanDialogState extends State<BluetoothScanDialog>
     return ListView.builder(
       itemCount: _classicDevices.length,
       itemBuilder: (context, index) {
-        final result = _classicDevices[index];
-        final device = result.device;
+        final device = _classicDevices[index]; // 이제 result가 아니라 device입니다.
         final name = device.name ?? '이름 없음';
-        final rssi = result.rssi;
 
         return ListTile(
           leading: const Icon(Icons.bluetooth, color: Color(0xFF10B981)),
@@ -322,20 +318,17 @@ class _BluetoothScanDialogState extends State<BluetoothScanDialog>
             name,
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          subtitle: Text(
-            'MAC: ${device.address}\nRSSI: $rssi',
-            style: const TextStyle(fontSize: 12),
-          ),
+          subtitle: Text('MAC: ${device.address}', style: const TextStyle(fontSize: 12)),
           trailing: _isScanning
               ? null
               : ElevatedButton(
-                  onPressed: () => _connectClassic(device),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('연결'),
-                ),
+            onPressed: () => _connectClassic(device),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('연결'),
+          ),
         );
       },
     );

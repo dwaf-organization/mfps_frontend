@@ -187,7 +187,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
       deviceCode: _deviceCode,
       patientCode: patientCode,
     );
-
+    debugPrint('_measurements_measurements $_measurements');
     // 서버가 응답 항목에 device_code를 내려주면 내부 값 갱신(구조/UI 변화 없음)
     if (_measurements.isNotEmpty) {
       _deviceCode = _measurements.last.deviceCode;
@@ -199,6 +199,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
   MeasurementBasicDto? get _latestMeasurement {
     if (_measurements.isEmpty) return null;
+    debugPrint('_measurements $_measurements');
     return _measurements.last;
   }
 
@@ -264,7 +265,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     debugPrint('[MEASUREMENT] GET $uri');
     final res = await http.get(uri, headers: await _headers());
     debugPrint('[MEASUREMENT] status=${res.statusCode} body=${res.body}');
-
+    debugPrint('[MEASUREMENT] status=${res.statusCode} body=${res.body}');
     // ✅ 측정 데이터 없음(서버가 404로 주는 경우) => 에러로 치지 않고 빈 값 처리
     if (res.statusCode == 404) {
       try {
@@ -282,6 +283,9 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
     }
 
     final decoded = jsonDecode(res.body);
+    debugPrint('res.body: ${res.body}');
+    debugPrint('jsonDecode(res.body): ${jsonDecode(res.body)}');
+    debugPrint('decodeddecoded: ${decoded}');
     if (decoded is! Map<String, dynamic>) throw Exception('측정값 조회 응답 형식 오류');
     if (decoded['code'] != 1) {
       final c = int.tryParse(decoded['code']?.toString() ?? '');
@@ -291,7 +295,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
     final data = decoded['data'];
     if (data is! Map<String, dynamic>) throw Exception('측정값 조회 data 형식 오류');
-
+    debugPrint('datadata: ${data}');
     final rawList = data['result'];
     if (rawList is! List) throw Exception('측정값 조회 result 형식 오류');
 
@@ -300,6 +304,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
         .map(MeasurementBasicDto.fromJson)
         .toList();
     list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    debugPrint('listlist $list');
     return list;
   }
 
@@ -309,7 +314,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
       '$_front_url/api/patient/warning?patient_code=$patientCode',
     );
     final res = await http.get(uri, headers: await _headers());
-
+    print("상세res: $res");
     debugPrint('[WARNING] status=${res.statusCode} body=${res.body}');
 
     if (res.statusCode < 200 || res.statusCode >= 300) return null;
