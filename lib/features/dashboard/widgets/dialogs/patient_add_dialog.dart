@@ -112,7 +112,10 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
     return decoded is Map<String, dynamic> ? decoded : null;
   }
 
-  Future<Map<String, dynamic>?> _postJson(Uri uri, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>?> _postJson(
+    Uri uri,
+    Map<String, dynamic> body,
+  ) async {
     final res = await http.post(
       uri,
       headers: await _authHeaders(),
@@ -147,7 +150,9 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
     setState(() => loadingBeds = true);
 
     try {
-      final uri = Uri.parse('$_baseUrl/api/patient/profile/empty-bed?hospital_st_code=$floorCode');
+      final uri = Uri.parse(
+        '$_baseUrl/api/patient/profile/empty-bed?hospital_st_code=$floorCode',
+      );
 
       final decoded = await _getJson(uri);
       if (decoded == null || decoded['code'] != 1) {
@@ -192,7 +197,8 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
       });
 
       int? initialBed;
-      if (widget.prefillBedCode != null && opts.any((e) => e.bedCode == widget.prefillBedCode)) {
+      if (widget.prefillBedCode != null &&
+          opts.any((e) => e.bedCode == widget.prefillBedCode)) {
         initialBed = widget.prefillBedCode;
       } else {
         initialBed = opts.isNotEmpty ? opts.first.bedCode : null;
@@ -231,7 +237,11 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
     final bedCode = selectedBedCode;
 
     // 기존 동작 유지(검증 항목/문구)
-    if (name.isEmpty || age == null || birthDate == null || diag.isEmpty || doctor.isEmpty) {
+    if (name.isEmpty ||
+        age == null ||
+        birthDate == null ||
+        diag.isEmpty ||
+        doctor.isEmpty) {
       _snack('필수 항목(환자명/나이/생년월일/진단명/주치의/담당 간호사)을 확인해 주세요.');
       return;
     }
@@ -283,10 +293,13 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
     final bedItems = bedOptions
         .map(
           (e) => DropdownMenuItem<int>(
-        value: e.bedCode,
-        child: Text(e.label, style: const TextStyle(fontWeight: FontWeight.w800)),
-      ),
-    )
+            value: e.bedCode,
+            child: Text(
+              e.label,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        )
         .toList();
 
     return Dialog(
@@ -299,7 +312,11 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: _cBorder),
           boxShadow: const [
-            BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, 8)),
+            BoxShadow(
+              color: Color(0x14000000),
+              blurRadius: 16,
+              offset: Offset(0, 8),
+            ),
           ],
         ),
         child: Column(
@@ -310,7 +327,14 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
               padding: const EdgeInsets.fromLTRB(22, 18, 18, 12),
               child: Row(
                 children: const [
-                  Text('환자 추가', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _cText)),
+                  Text(
+                    '환자 추가',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: _cText,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -345,28 +369,49 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
                       backgroundColor: _cGreen,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 22,
+                        vertical: 14,
+                      ),
                     ),
                     onPressed: saving ? null : _save,
                     child: saving
                         ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                        : const Text('추가', style: TextStyle(fontWeight: FontWeight.w900)),
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            '추가',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
                   ),
                   const SizedBox(width: 10),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF374151),
                       side: const BorderSide(color: _cBorder),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 14,
+                      ),
                     ),
-                    onPressed: saving ? null : () => Navigator.pop(context, false),
-                    child: const Text('닫기', style: TextStyle(fontWeight: FontWeight.w900)),
+                    onPressed: saving
+                        ? null
+                        : () => Navigator.pop(context, false),
+                    child: const Text(
+                      '닫기',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
                   ),
                 ],
               ),
@@ -383,8 +428,17 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
       child: Column(
         children: [
           _Row2(
-            left: _TextField(label: '환자명', controller: nameCtrl, requiredMark: true),
-            right: _TextField(label: '나이', controller: ageCtrl, keyboardType: TextInputType.number, requiredMark: true),
+            left: _TextField(
+              label: '환자명',
+              controller: nameCtrl,
+              requiredMark: true,
+            ),
+            right: _TextField(
+              label: '나이',
+              controller: ageCtrl,
+              keyboardType: TextInputType.number,
+              requiredMark: true,
+            ),
           ),
           const SizedBox(height: 12),
           _Row2(
@@ -406,6 +460,7 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
                   initialDate: birthDate ?? DateTime(now.year - 30, 1, 1),
                   firstDate: DateTime(1900, 1, 1),
                   lastDate: now,
+                  locale: const Locale('ko', 'KR'),
                   builder: (context, child) {
                     final base = Theme.of(context);
                     final cs = base.colorScheme;
@@ -423,36 +478,60 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
                         textButtonTheme: TextButtonThemeData(
                           style: TextButton.styleFrom(
                             foregroundColor: _cGray700,
-                            textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
                         datePickerTheme: DatePickerThemeData(
                           backgroundColor: Colors.white,
                           surfaceTintColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
                           dividerColor: _cBorder,
 
                           headerBackgroundColor: _cGreen,
                           headerForegroundColor: Colors.white,
 
-                          weekdayStyle: const TextStyle(fontWeight: FontWeight.w900, color: _cSubText),
-                          dayStyle: const TextStyle(fontWeight: FontWeight.w900, color: _cText),
+                          weekdayStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: _cSubText,
+                          ),
+                          dayStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: _cText,
+                          ),
 
-                          todayForegroundColor: MaterialStateProperty.all(_cGreen),
-                          todayBorder: BorderSide(color: _cGreen.withOpacity(0.35), width: 1),
+                          todayForegroundColor: MaterialStateProperty.all(
+                            _cGreen,
+                          ),
+                          todayBorder: BorderSide(
+                            color: _cGreen.withOpacity(0.35),
+                            width: 1,
+                          ),
 
-                          dayForegroundColor: MaterialStateProperty.resolveWith((states) {
-                            if (states.contains(MaterialState.selected)) return Colors.white;
-                            return _cText;
-                          }),
-                          dayBackgroundColor: MaterialStateProperty.resolveWith((states) {
-                            if (states.contains(MaterialState.selected)) return _cGreen;
-                            if (states.contains(MaterialState.pressed) || states.contains(MaterialState.hovered)) {
-                              return _cGreenSoft;
-                            }
-                            return Colors.transparent;
-                          }),
-                          dayOverlayColor: MaterialStateProperty.resolveWith((states) {
+                          dayForegroundColor: MaterialStateProperty.resolveWith(
+                            (states) {
+                              if (states.contains(MaterialState.selected))
+                                return Colors.white;
+                              return _cText;
+                            },
+                          ),
+                          dayBackgroundColor: MaterialStateProperty.resolveWith(
+                            (states) {
+                              if (states.contains(MaterialState.selected))
+                                return _cGreen;
+                              if (states.contains(MaterialState.pressed) ||
+                                  states.contains(MaterialState.hovered)) {
+                                return _cGreenSoft;
+                              }
+                              return Colors.transparent;
+                            },
+                          ),
+                          dayOverlayColor: MaterialStateProperty.resolveWith((
+                            states,
+                          ) {
                             if (states.contains(MaterialState.pressed) ||
                                 states.contains(MaterialState.hovered) ||
                                 states.contains(MaterialState.focused)) {
@@ -462,7 +541,8 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
                           }),
                         ),
                       ),
-                      child: child ?? const SizedBox.shrink(),
+                      // ── 달력 크기 조절: width / height 값을 바꾸세요 ──
+                      child: SizedBox(width: 600, height: 520, child: child),
                     );
                   },
                 );
@@ -470,7 +550,7 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
                 setState(() {
                   birthDate = picked;
                   birthCtrl.text =
-                  '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                      '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
                 });
               },
             ),
@@ -490,7 +570,10 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
               alignment: Alignment.centerLeft,
               child: Text(
                 '선택된 층이 없습니다. (층 선택 후 다시 시도)',
-                style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             )
           else if (loadingBeds)
@@ -499,43 +582,46 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             )
           else if (bedOptions.isEmpty)
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '빈 침대가 없습니다.',
-                  style: TextStyle(color: _cSubText, fontWeight: FontWeight.w800),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '빈 침대가 없습니다.',
+                style: TextStyle(color: _cSubText, fontWeight: FontWeight.w800),
+              ),
+            )
+          else
+            _FieldShell(
+              label: '침대',
+              requiredMark: true,
+              child: Theme(
+                // ✅ 드롭다운 펼쳤을 때 hover/press 느낌(화이트+그린)
+                data: Theme.of(context).copyWith(
+                  splashColor: _cGreen.withOpacity(0.10),
+                  highlightColor: _cGreen.withOpacity(0.10),
+                  hoverColor: _cGreenSoft,
+                  focusColor: _cGreenSoft,
                 ),
-              )
-            else
-              _FieldShell(
-                label: '침대',
-                requiredMark: true,
-                child: Theme(
-                  // ✅ 드롭다운 펼쳤을 때 hover/press 느낌(화이트+그린)
-                  data: Theme.of(context).copyWith(
-                    splashColor: _cGreen.withOpacity(0.10),
-                    highlightColor: _cGreen.withOpacity(0.10),
-                    hoverColor: _cGreenSoft,
-                    focusColor: _cGreenSoft,
-                  ),
-                  child: DropdownButtonFormField<int>(
-                    value: selectedBedCode,
-                    items: bedItems,
-                    onChanged: (v) => setState(() => selectedBedCode = v),
+                child: DropdownButtonFormField<int>(
+                  value: selectedBedCode,
+                  items: bedItems,
+                  onChanged: (v) => setState(() => selectedBedCode = v),
 
-                    dropdownColor: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    icon: const Icon(Icons.expand_more_rounded, color: Color(0xFF6B7280)),
-                    style: const TextStyle(
-                      color: Color(0xFF111827),
-                      fontWeight: FontWeight.w800,
-                    ),
-
-                    // ✅ 드롭다운 필드 포커스 보더만 그린 포인트
-                    decoration: _dropdownDeco(),
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  icon: const Icon(
+                    Icons.expand_more_rounded,
+                    color: Color(0xFF6B7280),
                   ),
+                  style: const TextStyle(
+                    color: Color(0xFF111827),
+                    fontWeight: FontWeight.w800,
+                  ),
+
+                  // ✅ 드롭다운 필드 포커스 보더만 그린 포인트
+                  decoration: _dropdownDeco(),
                 ),
               ),
+            ),
         ],
       ),
     );
@@ -547,12 +633,24 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
       child: Column(
         children: [
           _Row2(
-            left: _TextField(label: '진단명', controller: diagnosisCtrl, requiredMark: true),
-            right: _TextField(label: '주치의', controller: doctorCtrl, requiredMark: true),
+            left: _TextField(
+              label: '진단명',
+              controller: diagnosisCtrl,
+              requiredMark: true,
+            ),
+            right: _TextField(
+              label: '주치의',
+              controller: doctorCtrl,
+              requiredMark: true,
+            ),
           ),
           const SizedBox(height: 12),
           _Row2(
-            left: _TextField(label: '담당 간호사', controller: nurseCtrl, requiredMark: true),
+            left: _TextField(
+              label: '담당 간호사',
+              controller: nurseCtrl,
+              requiredMark: true,
+            ),
             right: _TextField(label: '알레르기', controller: allergyCtrl),
           ),
           const SizedBox(height: 12),
@@ -578,7 +676,8 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
   }
 
   static List _asList(dynamic v) => (v is List) ? v : const [];
-  static Map<String, dynamic>? _asMap(dynamic v) => (v is Map) ? Map<String, dynamic>.from(v) : null;
+  static Map<String, dynamic>? _asMap(dynamic v) =>
+      (v is Map) ? Map<String, dynamic>.from(v) : null;
   static String _toStr(dynamic v) => (v ?? '').toString().trim();
   static int? _toInt(dynamic v) => int.tryParse((v ?? '').toString().trim());
 }
@@ -716,7 +815,9 @@ class _DateField extends StatelessWidget {
         child: IgnorePointer(
           child: TextField(
             controller: controller,
-            decoration: _inputDeco(suffix: const Icon(Icons.calendar_today_outlined, size: 18)),
+            decoration: _inputDeco(
+              suffix: const Icon(Icons.calendar_today_outlined, size: 18),
+            ),
           ),
         ),
       ),
@@ -761,7 +862,10 @@ class _Dropdown<T> extends StatelessWidget {
             for (final it in items)
               DropdownMenuItem(
                 value: it,
-                child: Text(it.toString(), style: const TextStyle(fontWeight: FontWeight.w800)),
+                child: Text(
+                  it.toString(),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
               ),
           ],
           onChanged: (v) {
@@ -803,7 +907,13 @@ class _FieldShell extends StatelessWidget {
             Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
             if (requiredMark) ...[
               const SizedBox(width: 4),
-              const Text('*', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w900)),
+              const Text(
+                '*',
+                style: TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ],
           ],
         ),

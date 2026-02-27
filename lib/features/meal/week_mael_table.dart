@@ -4,20 +4,36 @@ import 'meal_status.dart';
 
 class WeekMealTable extends StatelessWidget {
   final List<String> dates;
+  final MealStatus Function(String date, String mealType) getStatus;
+  final void Function(String date) onDateTap;
 
-  const WeekMealTable({super.key, required this.dates});
+  const WeekMealTable({
+    super.key,
+    required this.dates,
+    required this.getStatus,
+    required this.onDateTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         _header(),
-        MealRow(title: '조식', statuses: List.filled(7, MealStatus.full)),
+        MealRow(
+          title: '조식',
+          statuses: dates.map((d) => getStatus(d, '조식')).toList(),
+          onCellTap: (i) => onDateTap(dates[i]),
+        ),
         MealRow(
           title: '중식',
-          statuses: [MealStatus.miss, ...List.filled(6, MealStatus.full)],
+          statuses: dates.map((d) => getStatus(d, '중식')).toList(),
+          onCellTap: (i) => onDateTap(dates[i]),
         ),
-        MealRow(title: '석식', statuses: List.filled(7, MealStatus.full)),
+        MealRow(
+          title: '석식',
+          statuses: dates.map((d) => getStatus(d, '석식')).toList(),
+          onCellTap: (i) => onDateTap(dates[i]),
+        ),
       ],
     );
   }

@@ -26,6 +26,7 @@ class BedPatientItem {
 
 class BedTile extends StatefulWidget {
   final int bedNo;
+  final String? bedLabel;
   final BedPatientItem? patient;
 
   /// 빈 침대 탭
@@ -40,6 +41,7 @@ class BedTile extends StatefulWidget {
   const BedTile({
     super.key,
     required this.bedNo,
+    this.bedLabel,
     required this.patient,
     this.onTap,
     this.onInfoTap,
@@ -189,7 +191,12 @@ class _BedTileState extends State<BedTile> {
 
                     FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text('침대 ${widget.bedNo}', style: bedTextStyle),
+                      child: Text(
+                        widget.bedLabel?.isNotEmpty == true
+                            ? widget.bedLabel!
+                            : '침대 ${widget.bedNo}',
+                        style: bedTextStyle,
+                      ),
                     ),
 
                     SizedBox(height: isCompact ? 6 : 8),
@@ -347,7 +354,7 @@ class _BedTileState extends State<BedTile> {
                           ),
                           label: Text(
                             _bluetoothStatus ==
-                                BluetoothConnectionStatus.connected
+                                    BluetoothConnectionStatus.connected
                                 ? '연결해제'
                                 : '블루투스',
                             style: TextStyle(
@@ -365,63 +372,6 @@ class _BedTileState extends State<BedTile> {
                           ),
                         ),
                       ),
-
-                      // ✅ ESP32 테스트 버튼들 (연결된 경우만)
-                      // if (_bluetoothStatus == BluetoothConnectionStatus.connected) ...[
-                      //   SizedBox(height: isCompact ? 4 : 6),
-                      //
-                      //   Row(
-                      //     children: [
-                      //       Expanded(
-                      //         child: SizedBox(
-                      //           height: isCompact ? 26 : 28,
-                      //           child: ElevatedButton(
-                      //             onPressed: () => _testTimeSync(),
-                      //             style: ElevatedButton.styleFrom(
-                      //               backgroundColor: Colors.blue,
-                      //               foregroundColor: Colors.white,
-                      //               padding: EdgeInsets.zero,
-                      //               shape: RoundedRectangleBorder(
-                      //                 borderRadius: BorderRadius.circular(6),
-                      //               ),
-                      //             ),
-                      //             child: Text(
-                      //               '시간',
-                      //               style: TextStyle(
-                      //                 fontSize: isCompact ? 9 : 10,
-                      //                 fontWeight: FontWeight.w800,
-                      //               ),
-                      //             ),
-                      //           ),
-                      //         ),
-                      //       ),
-                      //       SizedBox(width: 4),
-                      //       Expanded(
-                      //         child: SizedBox(
-                      //           height: isCompact ? 26 : 28,
-                      //           child: ElevatedButton(
-                      //             onPressed: () => _testGETCommand(),
-                      //             style: ElevatedButton.styleFrom(
-                      //               backgroundColor: Colors.green,
-                      //               foregroundColor: Colors.white,
-                      //               padding: EdgeInsets.zero,
-                      //               shape: RoundedRectangleBorder(
-                      //                 borderRadius: BorderRadius.circular(6),
-                      //               ),
-                      //             ),
-                      //             child: Text(
-                      //               'GET',
-                      //               style: TextStyle(
-                      //                 fontSize: isCompact ? 9 : 10,
-                      //                 fontWeight: FontWeight.w800,
-                      //               ),
-                      //             ),
-                      //           ),
-                      //         ),
-                      //       ),
-                      //     ],
-                      //   ),
-                      // ],
                     ] else ...[
                       SizedBox(height: isCompact ? 10 : 18),
                       const Text(
@@ -521,7 +471,9 @@ class _BedTileState extends State<BedTile> {
 
     debugPrint('🧪 [UI] 시간동기화 버튼 클릭: 환자=${widget.patient!.patientCode}');
 
-    final success = await _btManager.manualTimeSync(widget.patient!.patientCode);
+    final success = await _btManager.manualTimeSync(
+      widget.patient!.patientCode,
+    );
 
     debugPrint('🧪 [UI] 시간동기화 결과: ${success ? "성공" : "실패"}');
 
@@ -542,7 +494,9 @@ class _BedTileState extends State<BedTile> {
 
     debugPrint('🧪 [UI] GET 명령 버튼 클릭: 환자=${widget.patient!.patientCode}');
 
-    final success = await _btManager.manualDataRequest(widget.patient!.patientCode);
+    final success = await _btManager.manualDataRequest(
+      widget.patient!.patientCode,
+    );
 
     debugPrint('🧪 [UI] GET 명령 결과: ${success ? "성공" : "실패"}');
 
