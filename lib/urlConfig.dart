@@ -5,5 +5,5 @@ class Urlconfig {
   static const String awsServer = "https://www.mfps.site";
   static const String TabletServer2 = "http://172.30.1.89:3000";
   // static const String serverUrl = localServer;
-  static const String serverUrl = TabletServer2;
+  static const String serverUrl = awsServer;
 }

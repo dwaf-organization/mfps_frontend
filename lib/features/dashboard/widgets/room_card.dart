@@ -183,6 +183,7 @@ class _RoomsSectionState extends State<RoomsSection> {
       final uri = Uri.parse(
         '$base/api/hospital/structure?hospital_st_code=$st',
       );
+      debugPrint('[ROOM_CARD] 호실 조회 URL: $uri');
 
       final res = await http.get(
         uri,

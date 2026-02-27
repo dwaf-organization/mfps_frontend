@@ -11,6 +11,7 @@ import 'widgets/top_header.dart';
 import 'widgets/summary_cards.dart';
 import 'widgets/side_panel.dart';
 import 'widgets/room_card.dart';
+import '../../api/http_helper.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -37,6 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String floorLabel = '';
 
   bool floorsLoading = false;
+  int? _hospitalCode;
 
   // TODO: rooms / counts는 기존 provider 로직을 옮기거나 API 나오면 여기서 채우면 됨
   int total = 0,
@@ -65,6 +67,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         key: StorageKeys.selectedWardName);
     final savedWardStCodeStr = await _storage.read(
         key: StorageKeys.selectedWardStCode);
+    final savedHospitalCodeStr = await _storage.read(
+        key: StorageKeys.hospitalCode);
+    _hospitalCode = int.tryParse((savedHospitalCodeStr ?? '').trim());
 
     wardName = (savedWardName == null || savedWardName
         .trim()
@@ -290,9 +295,207 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .trim()
         .isEmpty ? '층 정보 없음' : floorLabel.trim();
 
-    return Text(
-      '$floorText 병동',
-      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+    return Row(
+      children: [
+        Text(
+          '$floorText 병동',
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(width: 12),
+        if (selectedFloorStCode != null && _hospitalCode != null)
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF65C466),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              elevation: 0,
+            ),
+            onPressed: _showAddRoomSheet,
+            child: const Text('호실 추가'),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _showAddRoomSheet() async {
+    final floorCode = selectedFloorStCode;
+    final hospCode = _hospitalCode;
+    if (floorCode == null || hospCode == null) return;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AddRoomBottomSheet(
+        frontUrl: _front_url,
+        hospitalCode: hospCode,
+        floorStCode: floorCode,
+        onAdded: loadData,
+      ),
+    );
+  }
+}
+
+class _AddRoomBottomSheet extends StatefulWidget {
+  final String frontUrl;
+  final int hospitalCode;
+  final int floorStCode;
+  final Future<void> Function() onAdded;
+
+  const _AddRoomBottomSheet({
+    required this.frontUrl,
+    required this.hospitalCode,
+    required this.floorStCode,
+    required this.onAdded,
+  });
+
+  @override
+  State<_AddRoomBottomSheet> createState() => _AddRoomBottomSheetState();
+}
+
+class _AddRoomBottomSheetState extends State<_AddRoomBottomSheet> {
+  final _ctrl = TextEditingController();
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final name = _ctrl.text.trim();
+    if (name.isEmpty) return;
+
+    setState(() => _loading = true);
+
+    try {
+      final uri = Uri.parse('${widget.frontUrl}/api/hospital/structure');
+      final decoded = await HttpHelper.postJson(uri, {
+        'hospital_code': widget.hospitalCode,
+        'category_name': name,
+        'parents_code': widget.floorStCode,
+        'note': null,
+      });
+
+      final ok = decoded['code'] == 1;
+      if (!ok) throw Exception((decoded['message'] ?? '호실 추가 실패').toString());
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      await widget.onAdded();
+    } catch (e) {
+      debugPrint('[ADD_ROOM] error=$e');
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('호실 추가 실패: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5E7EB),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const Text(
+            '호실 추가',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF111827)),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            '추가할 호실 이름을 입력해 주세요.',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF6B7280)),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
+            decoration: InputDecoration(
+              hintText: '예) 101호, 102호',
+              filled: true,
+              fillColor: const Color(0xFFF3F4F6),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF93C5FD)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: _loading ? null : () => Navigator.of(context).pop(),
+                  child: const Text('취소'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF65C466),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    elevation: 0,
+                  ),
+                  onPressed: _loading ? null : _submit,
+                  child: _loading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('추가'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

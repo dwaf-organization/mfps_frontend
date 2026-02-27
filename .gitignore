@@ -33,6 +33,12 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Junmini generated docs (local)
+.junmini/PROJECT_ANALYSIS.md
+.junmini/rule/FRONTEND_STYLE.md
+.junmini/history/2026-02-25.md
+.junmini/TODO.md
+
 # Symbolication related
 app.*.symbols
 
