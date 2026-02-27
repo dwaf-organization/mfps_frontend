@@ -11,7 +11,7 @@ import '../../../storage_keys.dart';
 
 import 'patient_list_card.dart';
 import 'dialogs/patient_add_dialog.dart';
-import 'dialogs/patient_edit_dialog.dart';
+import 'dialogs/patient_detail_dialog.dart';
 import 'side_panel_action_button.dart';
 
 enum PatientTab { all, danger, warning, stable }
@@ -296,17 +296,17 @@ class _SidePanelState extends State<SidePanel> {
                     selected: _selectedPatientCode == p.patientCode,
                     onTap: () async {
                       setState(() => _selectedPatientCode = p.patientCode);
-
                       final ok = await showDialog<bool>(
                         context: context,
-                        builder: (_) => PatientEditDialog(
+                        builder: (_) => PatientDetailDialog(
                           patientCode: p.patientCode,
-                          fromBedCode: 0,
+                          roomLabel: p.patientRoom,
+                          bedLabel: p.patientBed,
                           onRefresh: loadData,
                         ),
                       );
                       if (ok == true) {
-                        await loadData(); // 수정 후 사이드패널 재조회
+                        await loadData();
                       }
                     },
                   );
