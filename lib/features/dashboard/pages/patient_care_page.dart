@@ -592,7 +592,7 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
         physics: const NeverScrollableScrollPhysics(),
         itemCount: parts.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+          crossAxisCount: 4,
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
           childAspectRatio: 1.8,

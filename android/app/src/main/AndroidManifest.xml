@@ -14,16 +14,17 @@
     <application
         android:label="medicalapp"
         android:name="${applicationName}"
+        android:resizeableActivity="false"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher">
 
         <activity
-            android:usesCleartextTraffic="true"
             android:name=".MainActivity"
+            android:screenOrientation="landscape"
             android:exported="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
-            android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:launchMode="singleTask"
+            android:configChanges="keyboardHidden|screenSize"
+            android:resizeableActivity="false"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
