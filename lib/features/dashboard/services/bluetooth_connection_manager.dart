@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as ble;
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart' as classic;
 import 'package:http/http.dart' as http;
-import '../../../urlConfig.dart';
+import 'package:mfps/url_config.dart';
 
 // ESP32 UUID 상수 정의
 class ESP32UUIDs {
@@ -491,7 +491,7 @@ class BluetoothConnectionManager {
       return;
     }
 
-    final url = '${Urlconfig.serverUrl}/api/device/position/connect';
+    final url = '${UrlConfig.serverUrl}/api/device/position/connect';
     final requestBody = {
       'bed_code': bedCode,
       'device_unique_id': deviceMacAddress,
@@ -521,7 +521,7 @@ class BluetoothConnectionManager {
   Future<void> _sendDataToBackend(int patientCode,
       int deviceCode,
       List<String> csvLines,) async {
-    final url = '${Urlconfig.serverUrl}/api/measurement/basic';
+    final url = '${UrlConfig.serverUrl}/api/measurement/basic';
     print("측정값POST URL $url");
     final requestBody = {
       'device_code': deviceCode,
@@ -569,7 +569,7 @@ class BluetoothConnectionManager {
     final delaySeconds = 2 * attempt;
     await Future.delayed(Duration(seconds: delaySeconds));
 
-    final url = '${Urlconfig.serverUrl}/api/measurement/basic';
+    final url = '${UrlConfig.serverUrl}/api/measurement/basic';
     final requestBody = {
       'device_code': deviceCode,
       'patient_code': patientCode,
@@ -600,7 +600,7 @@ class BluetoothConnectionManager {
 
   Map<String, dynamic> getBackendConfig() {
     return {
-      'serverUrl': Urlconfig.serverUrl,
+      'serverUrl': UrlConfig.serverUrl,
       'deviceMappingCount': _deviceCodeMapping.length,
       'deviceMapping': Map<String, dynamic>.from(
           _deviceCodeMapping.map((k, v) => MapEntry(k.toString(), v))),

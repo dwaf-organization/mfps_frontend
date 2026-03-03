@@ -10,9 +10,10 @@ import 'package:http/http.dart' as http;
 
 // ✅ Bluetooth 추가
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart' as classic;
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'
+    as classic;
 import 'package:permission_handler/permission_handler.dart';
-import '../../../../urlConfig.dart';
+import 'package:mfps/url_config.dart';
 import 'patient_edit_dialog.dart';
 
 // ✅ BLE / Classic BT 통합 선택 결과
@@ -24,11 +25,11 @@ class _SelectedDevice {
   final classic.BluetoothDevice? classicDevice;
 
   const _SelectedDevice.ble(this.bleDevice)
-      : type = _BtType.ble,
-        classicDevice = null;
+    : type = _BtType.ble,
+      classicDevice = null;
   const _SelectedDevice.classic(this.classicDevice)
-      : type = _BtType.classic,
-        bleDevice = null;
+    : type = _BtType.classic,
+      bleDevice = null;
 
   String get displayName {
     if (bleDevice != null) {
@@ -81,7 +82,7 @@ class PatientDetailDialog extends ConsumerStatefulWidget {
 class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
   static const _storage = FlutterSecureStorage();
 
-  late final String _front_url;
+  late final String _frontUrl;
 
   bool _loading = true;
   bool _deleting = false;
@@ -126,7 +127,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
   @override
   void initState() {
     super.initState();
-    _front_url = Urlconfig.serverUrl.toString();
+    _frontUrl = UrlConfig.serverUrl.toString();
     loadData();
 
     // ✅ 권한 요청 (추가)
@@ -219,7 +220,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
   /// GET /api/patient/profile?patient_code=1
   Future<PatientProfileDto> _fetchPatientProfile(int patientCode) async {
     final uri = Uri.parse(
-      '$_front_url/api/patient/profile?patient_code=$patientCode',
+      '$_frontUrl/api/patient/profile?patient_code=$patientCode',
     );
     final res = await http.get(uri, headers: await _headers());
 
@@ -240,7 +241,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
   /// baseUrl에 /api 포함/미포함 섞여도 안전하게 합치기
   String _apiUrl(String pathAndQuery) {
-    final base = _front_url.trim().replaceAll(RegExp(r'/+$'), ''); // 끝 / 제거
+    final base = _frontUrl.trim().replaceAll(RegExp(r'/+$'), ''); // 끝 / 제거
     final p = pathAndQuery.startsWith('/') ? pathAndQuery : '/$pathAndQuery';
 
     // base가 .../api 로 끝나고, p가 /api/... 로 시작하면 /api 중복 제거
@@ -311,7 +312,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
   /// ✅ (추가) GET /api/patient/warning?patient_code=1
   Future<int?> _fetchPatientWarningState(int patientCode) async {
     final uri = Uri.parse(
-      '$_front_url/api/patient/warning?patient_code=$patientCode',
+      '$_frontUrl/api/patient/warning?patient_code=$patientCode',
     );
     final res = await http.get(uri, headers: await _headers());
     print("상세res: $res");
@@ -332,9 +333,7 @@ class _PatientDetailDialogState extends ConsumerState<PatientDetailDialog> {
 
   /// DELETE /api/patient/profile/delete/{patient_code}
   Future<void> _deletePatient(int patientCode) async {
-    final uri = Uri.parse(
-      '$_front_url/api/patient/profile/delete/$patientCode',
-    );
+    final uri = Uri.parse('$_frontUrl/api/patient/profile/delete/$patientCode');
     final res = await http.delete(uri, headers: await _headers());
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
@@ -1466,13 +1465,7 @@ class MeasurementBasicDto {
     int _i(dynamic v) => int.tryParse(v?.toString() ?? '') ?? 0;
     double _d(dynamic v) => double.tryParse(v?.toString() ?? '') ?? 0.0;
 
-    final rawTime = (j['create_at'] ?? '').toString();
-    DateTime parsed;
-    try {
-      parsed = DateTime.parse(rawTime);
-    } catch (_) {
-      parsed = DateTime.now();
-    }
+    final createdAt = _parseFlexibleTimestamp(j['create_at']);
 
     return MeasurementBasicDto(
       measurementCode: _i(j['measurement_code']),
@@ -1481,10 +1474,68 @@ class MeasurementBasicDto {
       temperature: _d(j['temperature']),
       bodyTemperature: _d(j['body_temperature']),
       humidity: _d(j['humidity']),
-      createdAt: parsed,
+      createdAt: createdAt,
       warningState: j['warning_state'] == null ? null : _i(j['warning_state']),
     );
   }
+}
+
+DateTime _parseFlexibleTimestamp(dynamic rawValue) {
+  if (rawValue == null) {
+    return DateTime.now();
+  }
+
+  if (rawValue is int) {
+    return _dateTimeFromEpoch(rawValue);
+  }
+
+  final rawText = rawValue.toString().trim();
+  if (rawText.isEmpty) {
+    return DateTime.now();
+  }
+
+  if (RegExp(r'^\d{10,13}$').hasMatch(rawText)) {
+    final epoch = int.tryParse(rawText);
+    if (epoch != null) {
+      return _dateTimeFromEpoch(epoch);
+    }
+  }
+
+  final compactDateTimeMatch = RegExp(
+    r'^(\d{4})(\d{2})(\d{2})[T ]?(\d{2})(\d{2})(\d{2})?$',
+  ).firstMatch(rawText);
+  if (compactDateTimeMatch != null) {
+    final second = compactDateTimeMatch.group(6) ?? '00';
+    final normalizedText =
+        '${compactDateTimeMatch.group(1)}-'
+        '${compactDateTimeMatch.group(2)}-'
+        '${compactDateTimeMatch.group(3)}T'
+        '${compactDateTimeMatch.group(4)}:'
+        '${compactDateTimeMatch.group(5)}:$second';
+
+    final parsedDateTime = DateTime.tryParse(normalizedText);
+    if (parsedDateTime != null) {
+      return parsedDateTime;
+    }
+  }
+
+  final normalizedText = rawText.contains(' ')
+      ? rawText.replaceFirst(' ', 'T')
+      : rawText;
+  final parsedDateTime = DateTime.tryParse(normalizedText);
+  if (parsedDateTime != null) {
+    return parsedDateTime;
+  }
+
+  debugPrint('Timestamp 파싱 오류: $rawText');
+  return DateTime.now();
+}
+
+DateTime _dateTimeFromEpoch(int epochValue) {
+  final isMilliseconds = epochValue.abs() >= 1000000000000;
+  return DateTime.fromMillisecondsSinceEpoch(
+    isMilliseconds ? epochValue : epochValue * 1000,
+  );
 }
 
 class PatientUi {
@@ -2274,8 +2325,8 @@ class _ScanningDialogState extends State<_ScanningDialog> {
 
     // ✅ 1) 이미 페어링된(bonded) Classic 기기를 먼저 표시
     try {
-      final bonded =
-          await classic.FlutterBluetoothSerial.instance.getBondedDevices();
+      final bonded = await classic.FlutterBluetoothSerial.instance
+          .getBondedDevices();
       debugPrint('[CLASSIC] bonded devices: ${bonded.length}');
       if (mounted) {
         setState(() {
@@ -2283,15 +2334,17 @@ class _ScanningDialogState extends State<_ScanningDialog> {
             final addr = d.address;
             if (addr.isEmpty) continue;
             final deviceName = d.name;
-            _items.add(_ScannedItem(
-              type: _BtType.classic,
-              name: (deviceName == null || deviceName.isEmpty)
-                  ? '페어링된 기기'
-                  : '$deviceName (페어링됨)',
-              address: addr,
-              rssi: 0,
-              classicDevice: d,
-            ));
+            _items.add(
+              _ScannedItem(
+                type: _BtType.classic,
+                name: (deviceName == null || deviceName.isEmpty)
+                    ? '페어링된 기기'
+                    : '$deviceName (페어링됨)',
+                address: addr,
+                rssi: 0,
+                classicDevice: d,
+              ),
+            );
           }
         });
       }
@@ -2348,42 +2401,43 @@ class _ScanningDialogState extends State<_ScanningDialog> {
       _classicScanSub = classic.FlutterBluetoothSerial.instance
           .startDiscovery()
           .listen(
-        (r) {
-          if (!mounted) return;
-          debugPrint(
-              '[CLASSIC] found: ${r.device.name} / ${r.device.address}');
-          setState(() {
-            final addr = r.device.address;
-            if (addr.isEmpty) return;
+            (r) {
+              if (!mounted) return;
+              debugPrint(
+                '[CLASSIC] found: ${r.device.name} / ${r.device.address}',
+              );
+              setState(() {
+                final addr = r.device.address;
+                if (addr.isEmpty) return;
 
-            // 이미 같은 MAC이면 업데이트
-            final idx = _items.indexWhere((i) => i.address == addr);
-            final deviceName = r.device.name;
-            final item = _ScannedItem(
-              type: _BtType.classic,
-              name: (deviceName == null || deviceName.isEmpty)
-                  ? '알 수 없는 기기'
-                  : deviceName,
-              address: addr,
-              rssi: r.rssi,
-              classicDevice: r.device,
-            );
+                // 이미 같은 MAC이면 업데이트
+                final idx = _items.indexWhere((i) => i.address == addr);
+                final deviceName = r.device.name;
+                final item = _ScannedItem(
+                  type: _BtType.classic,
+                  name: (deviceName == null || deviceName.isEmpty)
+                      ? '알 수 없는 기기'
+                      : deviceName,
+                  address: addr,
+                  rssi: r.rssi,
+                  classicDevice: r.device,
+                );
 
-            if (idx >= 0) {
-              _items[idx] = item; // 페어링 목록의 것을 갱신
-            } else {
-              _items.add(item);
-            }
-            _sortItems();
-          });
-        },
-        onError: (e) {
-          debugPrint('[CLASSIC DISCOVERY] stream error: $e');
-        },
-        onDone: () {
-          debugPrint('[CLASSIC DISCOVERY] done');
-        },
-      );
+                if (idx >= 0) {
+                  _items[idx] = item; // 페어링 목록의 것을 갱신
+                } else {
+                  _items.add(item);
+                }
+                _sortItems();
+              });
+            },
+            onError: (e) {
+              debugPrint('[CLASSIC DISCOVERY] stream error: $e');
+            },
+            onDone: () {
+              debugPrint('[CLASSIC DISCOVERY] done');
+            },
+          );
     } catch (e) {
       debugPrint('[CLASSIC SCAN] error: $e');
     }
@@ -2548,9 +2602,7 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF3C7),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: const Color(0xFFFCD34D),
-                      ),
+                      border: Border.all(color: const Color(0xFFFCD34D)),
                     ),
                     child: const Row(
                       children: [
@@ -2638,7 +2690,8 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                                   final selected = isBle
                                       ? _SelectedDevice.ble(item.bleDevice)
                                       : _SelectedDevice.classic(
-                                          item.classicDevice);
+                                          item.classicDevice,
+                                        );
                                   Navigator.of(context).pop(selected);
                                 },
                                 borderRadius: BorderRadius.circular(16),
@@ -2656,10 +2709,10 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                                         height: 44,
                                         decoration: BoxDecoration(
                                           color: typeColor.withOpacity(0.10),
-                                          borderRadius:
-                                              BorderRadius.circular(14),
-                                          border:
-                                              Border.all(color: _cBorder),
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          border: Border.all(color: _cBorder),
                                         ),
                                         child: Icon(
                                           Icons.bluetooth,
@@ -2689,17 +2742,18 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                                                 ),
                                                 const SizedBox(width: 8),
                                                 Container(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 2,
-                                                  ),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
                                                   decoration: BoxDecoration(
                                                     color: typeColor
                                                         .withOpacity(0.12),
                                                     borderRadius:
                                                         BorderRadius.circular(
-                                                            6),
+                                                          6,
+                                                        ),
                                                   ),
                                                   child: Text(
                                                     typeLabel,
@@ -2734,8 +2788,9 @@ class _ScanningDialogState extends State<_ScanningDialog> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: _cGreen,
-                                          borderRadius:
-                                              BorderRadius.circular(999),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
                                         ),
                                         child: const Text(
                                           '선택',

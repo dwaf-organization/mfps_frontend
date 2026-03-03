@@ -4,27 +4,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-import '../../../urlConfig.dart';
-import '../../../storage_keys.dart';
+import 'package:mfps/url_config.dart';
+import 'package:mfps/storage_keys.dart';
 
 import 'widgets/top_header.dart';
 import 'widgets/summary_cards.dart';
 import 'widgets/side_panel.dart';
 import 'widgets/room_card.dart';
-import '../../api/http_helper.dart';
+import 'package:mfps/api/http_helper.dart';
 
-class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState(
+  State<DashboardPage> createState() => _DashboardPageState(
   );
 }
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardPageState extends State<DashboardPage> {
   static const _storage = FlutterSecureStorage();
   final _scrollCtrl = ScrollController();
 
-  late final String _front_url;
+  late final String _frontUrl;
   Map<String, dynamic> data = {};
 
   bool _isLoading = true;
@@ -50,7 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _front_url = Urlconfig.serverUrl.toString();
+    _frontUrl = UrlConfig.serverUrl.toString();
     loadData();
   }
 
@@ -92,7 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       floorsLoading = true;
 
       final uri = Uri.parse(
-          '$_front_url/api/hospital/structure/floor?hospital_st_code=$wardStCode');
+          '$_frontUrl/api/hospital/structure/floor?hospital_st_code=$wardStCode');
       final res = await http.get(
           uri, headers: {'Content-Type': 'application/json'});
 
@@ -331,7 +331,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _AddRoomBottomSheet(
-        frontUrl: _front_url,
+        frontUrl: _frontUrl,
         hospitalCode: hospCode,
         floorStCode: floorCode,
         onAdded: loadData,

@@ -5,14 +5,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../../../urlConfig.dart';
+import 'package:mfps/url_config.dart';
 import 'bed_tile.dart';
 import '../services/bluetooth_connection_manager.dart'; // 🚀 추가
 
 import 'dialogs/patient_add_dialog.dart';
 import '../pages/patient_detail_page.dart';
 import '../pages/patient_care_page.dart';
-import '../../../api/http_helper.dart';
+import 'package:mfps/api/http_helper.dart';
 
 /// 명세 예시:
 /// GET /api/hospital/structure?hospital_st_code=<floorStCode>
@@ -180,7 +180,7 @@ class _RoomsSectionState extends State<RoomsSection> {
     });
 
     try {
-      final base = Urlconfig.serverUrl;
+      final base = UrlConfig.serverUrl;
       final uri = Uri.parse(
         '$base/api/hospital/structure?hospital_st_code=$st',
       );
@@ -596,7 +596,7 @@ class _RoomDetailDialogState extends State<_RoomDetailDialog> {
 
   Future<void> _loadDetail() async {
     final roomCode = widget.room.hospitalStCode;
-    final base = Urlconfig.serverUrl;
+    final base = UrlConfig.serverUrl;
     final uri = Uri.parse('$base/api/hospital/structure/room/$roomCode');
     debugPrint('[ROOM_DETAIL] 조회 URL: $uri');
 
@@ -712,7 +712,7 @@ class _RoomDetailDialogState extends State<_RoomDetailDialog> {
     if (!mounted) return;
 
     try {
-      final base = Urlconfig.serverUrl;
+      final base = UrlConfig.serverUrl;
       final uri = Uri.parse(
         '$base/api/hospital/structure/bed/${bed.hospitalStCode}',
       );
@@ -824,7 +824,7 @@ class _RoomDetailDialogState extends State<_RoomDetailDialog> {
     if (!mounted) return;
 
     try {
-      final base = Urlconfig.serverUrl;
+      final base = UrlConfig.serverUrl;
       final uri = Uri.parse(
         '$base/api/hospital/structure/room/${widget.room.hospitalStCode}',
       );
@@ -898,7 +898,7 @@ class _RoomDetailDialogState extends State<_RoomDetailDialog> {
     setState(() => _saving = true);
 
     try {
-      final base = Urlconfig.serverUrl;
+      final base = UrlConfig.serverUrl;
       final uri = Uri.parse('$base/api/hospital/structure/room/update');
 
       final bedsList = _beds

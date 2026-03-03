@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'week_mael_table.dart';
+import 'week_meal_table.dart';
 import 'meal_status.dart';
 
 class MealTab extends StatefulWidget {

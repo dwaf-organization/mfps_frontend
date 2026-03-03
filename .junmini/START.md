@@ -2,7 +2,7 @@
 
 【1단계】 프로젝트를 분석하세요.
 【2단계】 분석 결과를 반드시 아래 파일에 저장하세요:
-/Users/suhyeon/Desktop/dwaf_repository/mfps_frontend/.junmini/PROJECT_ANALYSIS.md
+/Users/suhyeon/Desktop/dwaf_repository/mfps-refactor/mfps-fe/.junmini/PROJECT_ANALYSIS.md
 
 🚨 이 경로는 AGENTS.md/CLAUDE.md의 다른 저장 위치 규칙과 관계없이
 반드시 위 경로(.junmini/)에 저장해야 합니다.
@@ -55,6 +55,6 @@
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚠️ 필수: 작업 종료 전 반드시 수행할 것
-【1】 .junmini/history/2026-02-25.md에 오늘 작업 기록 저장 (필수)
+【1】 .junmini/history/2026-03-03.md에 오늘 작업 기록 저장 (필수)
 【2】 .junmini/TODO.md에 미완료/진행중 작업 업데이트 (필수)
 【3】 중요한 결정이 있었다면 .junmini/DECISIONS.md에 추가 (권장)

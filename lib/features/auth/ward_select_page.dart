@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../urlConfig.dart';
-import '../../../../storage_keys.dart';
+import 'package:mfps/url_config.dart';
+import 'package:mfps/storage_keys.dart';
 
-import '../../api/http_helper.dart';
+import 'package:mfps/api/http_helper.dart';
 
 /// =======================
 /// Models
@@ -22,12 +22,12 @@ class WardItem {
     required this.sortOrder,
   });
 
-  factory WardItem.fromJson(Map<String, dynamic> j) {
+  factory WardItem.fromJson(Map<String, dynamic> json) {
     return WardItem(
       hospitalStCode:
-          int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? 0,
-      categoryName: (j['category_name'] ?? '').toString(),
-      sortOrder: int.tryParse(j['sort_order']?.toString() ?? '') ?? 0,
+          int.tryParse(json['hospital_st_code']?.toString() ?? '') ?? 0,
+      categoryName: (json['category_name'] ?? '').toString(),
+      sortOrder: int.tryParse(json['sort_order']?.toString() ?? '') ?? 0,
     );
   }
 
@@ -51,33 +51,33 @@ class FloorItem {
     required this.sortOrder,
   });
 
-  factory FloorItem.fromJson(Map<String, dynamic> j) {
+  factory FloorItem.fromJson(Map<String, dynamic> json) {
     return FloorItem(
       hospitalFlCode:
-          int.tryParse(j['hospital_fl_code']?.toString() ?? '') ?? 0,
+          int.tryParse(json['hospital_fl_code']?.toString() ?? '') ?? 0,
       hospitalStCode:
-          int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? 0,
-      floorName: (j['floor_name'] ?? j['category_name'] ?? '').toString(),
-      sortOrder: int.tryParse(j['sort_order']?.toString() ?? '') ?? 0,
+          int.tryParse(json['hospital_st_code']?.toString() ?? '') ?? 0,
+      floorName: (json['floor_name'] ?? json['category_name'] ?? '').toString(),
+      sortOrder: int.tryParse(json['sort_order']?.toString() ?? '') ?? 0,
     );
   }
 }
 
 /// =======================
-/// Screen
+/// Page
 /// =======================
-class WardSelectScreen extends StatefulWidget {
-  const WardSelectScreen({super.key});
+class WardSelectPage extends StatefulWidget {
+  const WardSelectPage({super.key});
 
   @override
-  State<WardSelectScreen> createState() => _WardSelectScreenState();
+  State<WardSelectPage> createState() => _WardSelectPageState();
 }
 
-class _WardSelectScreenState extends State<WardSelectScreen> {
+class _WardSelectPageState extends State<WardSelectPage> {
   static const _storage = FlutterSecureStorage();
 
-  static const _kHospitalCode = 'hospital_code';
-  static const _kSelectedWardJson = 'selected_ward_json';
+  static const _hospitalCodeStorageKey = 'hospital_code';
+  static const _selectedWardStorageKey = 'selected_ward_json';
 
   late final String _frontUrl;
 
@@ -93,13 +93,15 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
   @override
   void initState() {
     super.initState();
-    _frontUrl = Urlconfig.serverUrl.toString();
-    _loadHospitalCode();
+    _frontUrl = UrlConfig.serverUrl.toString();
+    _loadStoredHospitalCode();
   }
 
-  Future<void> _loadHospitalCode() async {
-    final codeStr = await _storage.read(key: _kHospitalCode);
-    hospitalCode = int.tryParse(codeStr ?? '');
+  Future<void> _loadStoredHospitalCode() async {
+    final storedHospitalCode = await _storage.read(
+      key: _hospitalCodeStorageKey,
+    );
+    hospitalCode = int.tryParse(storedHospitalCode ?? '');
     if (hospitalCode != null) {
       await _loadWards();
     } else {
@@ -131,21 +133,23 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
       if (data is! Map) throw Exception('병동 조회 data가 비었습니다.');
 
       final parts = data['parts'];
-      final List<WardItem> next = [];
+      final List<WardItem> wardItems = [];
       if (parts is List) {
-        for (final e in parts) {
-          if (e is Map<String, dynamic>) {
-            next.add(WardItem.fromJson(e));
-          } else if (e is Map) {
-            next.add(WardItem.fromJson(Map<String, dynamic>.from(e)));
+        for (final part in parts) {
+          if (part is Map<String, dynamic>) {
+            wardItems.add(WardItem.fromJson(part));
+          } else if (part is Map) {
+            wardItems.add(WardItem.fromJson(Map<String, dynamic>.from(part)));
           }
         }
       }
-      next.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      wardItems.sort((leftWard, rightWard) {
+        return leftWard.sortOrder.compareTo(rightWard.sortOrder);
+      });
 
       if (!mounted) return;
       setState(() {
-        wards = next;
+        wards = wardItems;
         wardsLoading = false;
       });
 
@@ -168,16 +172,16 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
     }
   }
 
-  Future<void> _onWardTap(WardItem w) async {
+  Future<void> _onWardTap(WardItem selectedWard) async {
     setState(() {
-      _selectedWard = w;
+      _selectedWard = selectedWard;
       _floors = [];
       _floorsLoading = true;
     });
 
     try {
       final uri = Uri.parse(
-        '$_frontUrl/api/hospital/structure/floor?hospital_st_code=${w.hospitalStCode}',
+        '$_frontUrl/api/hospital/structure/floor?hospital_st_code=${selectedWard.hospitalStCode}',
       );
       final decoded = await HttpHelper.getJson(uri);
 
@@ -188,21 +192,25 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
       if (data is! Map) throw Exception('층 조회 data가 비었습니다.');
 
       final rawFloors = data['floors'] ?? data['parts'];
-      final List<FloorItem> next = [];
+      final List<FloorItem> floorItems = [];
       if (rawFloors is List) {
-        for (final e in rawFloors) {
-          if (e is Map<String, dynamic>) {
-            next.add(FloorItem.fromJson(e));
-          } else if (e is Map) {
-            next.add(FloorItem.fromJson(Map<String, dynamic>.from(e)));
+        for (final floor in rawFloors) {
+          if (floor is Map<String, dynamic>) {
+            floorItems.add(FloorItem.fromJson(floor));
+          } else if (floor is Map) {
+            floorItems.add(
+              FloorItem.fromJson(Map<String, dynamic>.from(floor)),
+            );
           }
         }
       }
-      next.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      floorItems.sort((leftFloor, rightFloor) {
+        return leftFloor.sortOrder.compareTo(rightFloor.sortOrder);
+      });
 
       if (!mounted) return;
       setState(() {
-        _floors = next;
+        _floors = floorItems;
         _floorsLoading = false;
       });
     } catch (e) {
@@ -217,23 +225,23 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
   }
 
   Future<void> _confirmWard() async {
-    final w = _selectedWard;
-    if (w == null) {
+    final selectedWard = _selectedWard;
+    if (selectedWard == null) {
       _snack('병동을 선택해 주세요.');
       return;
     }
 
     await _storage.write(
-      key: _kSelectedWardJson,
-      value: jsonEncode(w.toJson()),
+      key: _selectedWardStorageKey,
+      value: jsonEncode(selectedWard.toJson()),
     );
     await _storage.write(
       key: StorageKeys.selectedWardStCode,
-      value: w.hospitalStCode.toString(),
+      value: selectedWard.hospitalStCode.toString(),
     );
     await _storage.write(
       key: StorageKeys.selectedWardName,
-      value: w.categoryName,
+      value: selectedWard.categoryName,
     );
 
     if (!mounted) return;
@@ -241,8 +249,8 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
   }
 
   Future<void> _showEditFloorSheet(FloorItem floor) async {
-    final ward = _selectedWard;
-    if (ward == null) return;
+    final selectedWard = _selectedWard;
+    if (selectedWard == null) return;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -250,14 +258,14 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
       builder: (_) => _EditFloorBottomSheet(
         frontUrl: _frontUrl,
         floor: floor,
-        onUpdated: () => _onWardTap(ward),
+        onUpdated: () => _onWardTap(selectedWard),
       ),
     );
   }
 
   Future<void> _showAddFloorSheet() async {
-    final ward = _selectedWard;
-    if (ward == null || hospitalCode == null) return;
+    final selectedWard = _selectedWard;
+    if (selectedWard == null || hospitalCode == null) return;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -265,8 +273,8 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
       builder: (_) => _AddFloorBottomSheet(
         frontUrl: _frontUrl,
         hospitalCode: hospitalCode!,
-        parentCode: ward.hospitalStCode,
-        onAdded: () => _onWardTap(ward),
+        parentCode: selectedWard.hospitalStCode,
+        onAdded: () => _onWardTap(selectedWard),
       ),
     );
   }
@@ -286,8 +294,8 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
   }
 
   Future<void> _backToLogin() async {
-    await _storage.delete(key: _kHospitalCode);
-    await _storage.delete(key: _kSelectedWardJson);
+    await _storage.delete(key: _hospitalCodeStorageKey);
+    await _storage.delete(key: _selectedWardStorageKey);
     await _storage.delete(key: StorageKeys.selectedWardStCode);
     await _storage.delete(key: StorageKeys.selectedWardName);
 

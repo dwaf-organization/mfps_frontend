@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-import '../../../../urlConfig.dart';
+import 'package:mfps/url_config.dart';
 import '../widgets/dialogs/patient_edit_dialog.dart';
 
 class PatientDetailPage extends ConsumerStatefulWidget {
@@ -36,7 +36,7 @@ class PatientDetailPage extends ConsumerStatefulWidget {
 class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
   static const _storage = FlutterSecureStorage();
 
-  late final String _front_url;
+  late final String _frontUrl;
 
   bool _loading = true;
   bool _deleting = false;
@@ -62,7 +62,7 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
   @override
   void initState() {
     super.initState();
-    _front_url = Urlconfig.serverUrl.toString();
+    _frontUrl = UrlConfig.serverUrl.toString();
     loadData();
   }
 
@@ -169,7 +169,7 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
   /// GET /api/patient/profile?patient_code=1
   Future<PatientProfileDto> _fetchPatientProfile(int patientCode) async {
     final uri = Uri.parse(
-      '$_front_url/api/patient/profile?patient_code=$patientCode',
+      '$_frontUrl/api/patient/profile?patient_code=$patientCode',
     );
     final res = await http.get(uri, headers: await _headers());
 
@@ -189,7 +189,7 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
 
   /// baseUrl에 /api 포함/미포함 섞여도 안전하게 합치기
   String _apiUrl(String pathAndQuery) {
-    final base = _front_url.trim().replaceAll(RegExp(r'/+$'), ''); // 끝 / 제거
+    final base = _frontUrl.trim().replaceAll(RegExp(r'/+$'), ''); // 끝 / 제거
     final p = pathAndQuery.startsWith('/') ? pathAndQuery : '/$pathAndQuery';
 
     // base가 .../api 로 끝나고, p가 /api/... 로 시작하면 /api 중복 제거
@@ -244,15 +244,19 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
     // 🚀 수정: 단일 객체를 직접 처리
     try {
       final measurement = MeasurementBasicDto.fromJson(data);
-      return [measurement];  // 단일 항목을 리스트로 반환
+      return [measurement]; // 단일 항목을 리스트로 반환
     } catch (e) {
       throw Exception('측정값 파싱 오류: $e');
     }
   }
 
   /// 🚀 새로 추가: GET /api/measurement/basic/chart?patient_code=1
-  Future<Map<String, List<ChartDataPoint>>> _fetchMeasurementChart(int patientCode) async {
-    final url = _apiUrl('/api/measurement/basic/chart?patient_code=$patientCode');
+  Future<Map<String, List<ChartDataPoint>>> _fetchMeasurementChart(
+    int patientCode,
+  ) async {
+    final url = _apiUrl(
+      '/api/measurement/basic/chart?patient_code=$patientCode',
+    );
     final uri = Uri.parse(url);
 
     debugPrint('[CHART] GET $uri');
@@ -276,16 +280,25 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
     final result = <String, List<ChartDataPoint>>{};
 
     // temperature 파싱
-    final tempList = (data['temperature'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    result['temperature'] = tempList.map((item) => ChartDataPoint.fromJson(item)).toList();
+    final tempList =
+        (data['temperature'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    result['temperature'] = tempList
+        .map((item) => ChartDataPoint.fromJson(item))
+        .toList();
 
     // humidity 파싱
-    final humList = (data['humidity'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    result['humidity'] = humList.map((item) => ChartDataPoint.fromJson(item)).toList();
+    final humList =
+        (data['humidity'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    result['humidity'] = humList
+        .map((item) => ChartDataPoint.fromJson(item))
+        .toList();
 
     // body_temperature 파싱
-    final bodyTempList = (data['body_temperature'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    result['body_temperature'] = bodyTempList.map((item) => ChartDataPoint.fromJson(item)).toList();
+    final bodyTempList =
+        (data['body_temperature'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    result['body_temperature'] = bodyTempList
+        .map((item) => ChartDataPoint.fromJson(item))
+        .toList();
 
     // 시간순 정렬
     for (final list in result.values) {
@@ -298,7 +311,7 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
   /// ✅ (추가) GET /api/patient/warning?patient_code=1
   Future<int?> _fetchPatientWarningState(int patientCode) async {
     final uri = Uri.parse(
-      '$_front_url/api/patient/warning?patient_code=$patientCode',
+      '$_frontUrl/api/patient/warning?patient_code=$patientCode',
     );
     final res = await http.get(uri, headers: await _headers());
 
@@ -319,9 +332,7 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
 
   /// DELETE /api/patient/profile/delete/{patient_code}
   Future<void> _deletePatient(int patientCode) async {
-    final uri = Uri.parse(
-      '$_front_url/api/patient/profile/delete/$patientCode',
-    );
+    final uri = Uri.parse('$_frontUrl/api/patient/profile/delete/$patientCode');
     final res = await http.delete(uri, headers: await _headers());
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
@@ -404,9 +415,13 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
     // 최신 10개 vs 전체 선택
     final selectedPoints = isFullData
         ? chartPoints
-        : (chartPoints.length > 10 ? chartPoints.sublist(chartPoints.length - 10) : chartPoints);
+        : (chartPoints.length > 10
+              ? chartPoints.sublist(chartPoints.length - 10)
+              : chartPoints);
 
-    final points = selectedPoints.map((cp) => _ChartPoint(cp.timestamp, cp.value)).toList();
+    final points = selectedPoints
+        .map((cp) => _ChartPoint(cp.timestamp, cp.value))
+        .toList();
 
     return _ChartSeries(
       title: title,
@@ -566,66 +581,84 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
     final hasChartData = _chartData.isNotEmpty;
 
     // 🚀 새로운 차트 시리즈 생성 (최신 10개)
-    final bodyTempSeries = hasChartData ? _createChartSeries(
-      dataType: 'body_temperature',
-      title: '체온',
-      unit: '°C',
-      yMin: 35, yMax: 40,
-      lineColor: const Color(0xFFEF4444),
-      dotColor: const Color(0xFFB91C1C),
-      isFullData: false,
-    ) : _emptyChartSeries('체온', '°C', 35, 40, const Color(0xFFEF4444));
+    final bodyTempSeries = hasChartData
+        ? _createChartSeries(
+            dataType: 'body_temperature',
+            title: '체온',
+            unit: '°C',
+            yMin: 35,
+            yMax: 40,
+            lineColor: const Color(0xFFEF4444),
+            dotColor: const Color(0xFFB91C1C),
+            isFullData: false,
+          )
+        : _emptyChartSeries('체온', '°C', 35, 40, const Color(0xFFEF4444));
 
-    final roomTempSeries = hasChartData ? _createChartSeries(
-      dataType: 'temperature',
-      title: '병실온도',
-      unit: '°C',
-      yMin: 16, yMax: 32,
-      lineColor: const Color(0xFF06B6D4),
-      dotColor: const Color(0xFF0284C7),
-      isFullData: false,
-    ) : _emptyChartSeries('병실온도', '°C', 16, 32, const Color(0xFF06B6D4));
+    final roomTempSeries = hasChartData
+        ? _createChartSeries(
+            dataType: 'temperature',
+            title: '병실온도',
+            unit: '°C',
+            yMin: 16,
+            yMax: 32,
+            lineColor: const Color(0xFF06B6D4),
+            dotColor: const Color(0xFF0284C7),
+            isFullData: false,
+          )
+        : _emptyChartSeries('병실온도', '°C', 16, 32, const Color(0xFF06B6D4));
 
-    final humiditySeries = hasChartData ? _createChartSeries(
-      dataType: 'humidity',
-      title: '습도',
-      unit: '%',
-      yMin: 0, yMax: 100,
-      lineColor: const Color(0xFF3B82F6),
-      dotColor: const Color(0xFF1D4ED8),
-      isFullData: false,
-    ) : _emptyChartSeries('습도', '%', 0, 100, const Color(0xFF3B82F6));
+    final humiditySeries = hasChartData
+        ? _createChartSeries(
+            dataType: 'humidity',
+            title: '습도',
+            unit: '%',
+            yMin: 0,
+            yMax: 100,
+            lineColor: const Color(0xFF3B82F6),
+            dotColor: const Color(0xFF1D4ED8),
+            isFullData: false,
+          )
+        : _emptyChartSeries('습도', '%', 0, 100, const Color(0xFF3B82F6));
 
     // 🚀 확대용 차트 시리즈 (전체 데이터)
-    final bodyTempSeriesFull = hasChartData ? _createChartSeries(
-      dataType: 'body_temperature',
-      title: '체온',
-      unit: '°C',
-      yMin: 35, yMax: 40,
-      lineColor: const Color(0xFFEF4444),
-      dotColor: const Color(0xFFB91C1C),
-      isFullData: true,
-    ) : _emptyChartSeries('체온', '°C', 35, 40, const Color(0xFFEF4444));
+    final bodyTempSeriesFull = hasChartData
+        ? _createChartSeries(
+            dataType: 'body_temperature',
+            title: '체온',
+            unit: '°C',
+            yMin: 35,
+            yMax: 40,
+            lineColor: const Color(0xFFEF4444),
+            dotColor: const Color(0xFFB91C1C),
+            isFullData: true,
+          )
+        : _emptyChartSeries('체온', '°C', 35, 40, const Color(0xFFEF4444));
 
-    final roomTempSeriesFull = hasChartData ? _createChartSeries(
-      dataType: 'temperature',
-      title: '병실온도',
-      unit: '°C',
-      yMin: 16, yMax: 32,
-      lineColor: const Color(0xFF06B6D4),
-      dotColor: const Color(0xFF0284C7),
-      isFullData: true,
-    ) : _emptyChartSeries('병실온도', '°C', 16, 32, const Color(0xFF06B6D4));
+    final roomTempSeriesFull = hasChartData
+        ? _createChartSeries(
+            dataType: 'temperature',
+            title: '병실온도',
+            unit: '°C',
+            yMin: 16,
+            yMax: 32,
+            lineColor: const Color(0xFF06B6D4),
+            dotColor: const Color(0xFF0284C7),
+            isFullData: true,
+          )
+        : _emptyChartSeries('병실온도', '°C', 16, 32, const Color(0xFF06B6D4));
 
-    final humiditySeriesFull = hasChartData ? _createChartSeries(
-      dataType: 'humidity',
-      title: '습도',
-      unit: '%',
-      yMin: 0, yMax: 100,
-      lineColor: const Color(0xFF3B82F6),
-      dotColor: const Color(0xFF1D4ED8),
-      isFullData: true,
-    ) : _emptyChartSeries('습도', '%', 0, 100, const Color(0xFF3B82F6));
+    final humiditySeriesFull = hasChartData
+        ? _createChartSeries(
+            dataType: 'humidity',
+            title: '습도',
+            unit: '%',
+            yMin: 0,
+            yMax: 100,
+            lineColor: const Color(0xFF3B82F6),
+            dotColor: const Color(0xFF1D4ED8),
+            isFullData: true,
+          )
+        : _emptyChartSeries('습도', '%', 0, 100, const Color(0xFF3B82F6));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
@@ -794,7 +827,7 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
                 ),
               ],
             ),
-            SizedBox(height: 50,)
+            SizedBox(height: 50),
           ],
         ),
       ),
@@ -802,7 +835,13 @@ class _PatientDetailPageState extends ConsumerState<PatientDetailPage> {
   }
 
   /// 🚀 빈 차트 시리즈 생성 (차트 데이터 없을 때 사용)
-  _ChartSeries _emptyChartSeries(String title, String unit, double yMin, double yMax, Color color) {
+  _ChartSeries _emptyChartSeries(
+    String title,
+    String unit,
+    double yMin,
+    double yMax,
+    Color color,
+  ) {
     return _ChartSeries(
       title: title,
       unit: unit,
@@ -904,13 +943,7 @@ class MeasurementBasicDto {
     int _i(dynamic v) => int.tryParse(v?.toString() ?? '') ?? 0;
     double _d(dynamic v) => double.tryParse(v?.toString() ?? '') ?? 0.0;
 
-    final rawTime = (j['create_at'] ?? '').toString();
-    DateTime parsed;
-    try {
-      parsed = DateTime.parse(rawTime);
-    } catch (_) {
-      parsed = DateTime.now();
-    }
+    final createdAt = _parseFlexibleTimestamp(j['create_at']);
 
     return MeasurementBasicDto(
       measurementCode: _i(j['measurement_code']),
@@ -919,7 +952,7 @@ class MeasurementBasicDto {
       temperature: _d(j['temperature']),
       bodyTemperature: _d(j['body_temperature']),
       humidity: _d(j['humidity']),
-      createdAt: parsed,
+      createdAt: createdAt,
       warningState: j['warning_state'] == null ? null : _i(j['warning_state']),
     );
   }
@@ -930,49 +963,72 @@ class ChartDataPoint {
   final double value;
   final DateTime timestamp;
 
-  const ChartDataPoint({
-    required this.value,
-    required this.timestamp,
-  });
+  const ChartDataPoint({required this.value, required this.timestamp});
 
   factory ChartDataPoint.fromJson(Map<String, dynamic> json) {
     final value = double.tryParse(json['value']?.toString() ?? '') ?? 0.0;
-    final timestampStr = json['timestamp']?.toString() ?? '';
-
-    DateTime timestamp;
-    try {
-      // "20260109T15:04" -> "2026-01-09T15:04:00"
-      if (timestampStr.length >= 13 && timestampStr.contains('T')) {
-        final parts = timestampStr.split('T');
-        if (parts.length == 2) {
-          final datePart = parts[0]; // "20260109"
-          final timePart = parts[1]; // "1504"
-
-          if (datePart.length >= 8 && timePart.length >= 4) {
-            final year = datePart.substring(0, 4);
-            final month = datePart.substring(4, 6);
-            final day = datePart.substring(6, 8);
-            final hour = timePart.substring(0, 2);
-            final minute = timePart.substring(2, 4);
-
-            final isoString = '$year-$month-${day}T$hour:$minute:00';
-            timestamp = DateTime.parse(isoString);
-          } else {
-            timestamp = DateTime.now();
-          }
-        } else {
-          timestamp = DateTime.now();
-        }
-      } else {
-        timestamp = DateTime.now();
-      }
-    } catch (e) {
-      debugPrint('Timestamp 파싱 오류: $timestampStr -> $e');
-      timestamp = DateTime.now();
-    }
+    final timestamp = _parseFlexibleTimestamp(json['timestamp']);
 
     return ChartDataPoint(value: value, timestamp: timestamp);
   }
+}
+
+DateTime _parseFlexibleTimestamp(dynamic rawValue) {
+  if (rawValue == null) {
+    return DateTime.now();
+  }
+
+  if (rawValue is int) {
+    return _dateTimeFromEpoch(rawValue);
+  }
+
+  final rawText = rawValue.toString().trim();
+  if (rawText.isEmpty) {
+    return DateTime.now();
+  }
+
+  if (RegExp(r'^\d{10,13}$').hasMatch(rawText)) {
+    final epoch = int.tryParse(rawText);
+    if (epoch != null) {
+      return _dateTimeFromEpoch(epoch);
+    }
+  }
+
+  final compactDateTimeMatch = RegExp(
+    r'^(\d{4})(\d{2})(\d{2})[T ]?(\d{2})(\d{2})(\d{2})?$',
+  ).firstMatch(rawText);
+  if (compactDateTimeMatch != null) {
+    final second = compactDateTimeMatch.group(6) ?? '00';
+    final normalizedText =
+        '${compactDateTimeMatch.group(1)}-'
+        '${compactDateTimeMatch.group(2)}-'
+        '${compactDateTimeMatch.group(3)}T'
+        '${compactDateTimeMatch.group(4)}:'
+        '${compactDateTimeMatch.group(5)}:$second';
+
+    final parsedDateTime = DateTime.tryParse(normalizedText);
+    if (parsedDateTime != null) {
+      return parsedDateTime;
+    }
+  }
+
+  final normalizedText = rawText.contains(' ')
+      ? rawText.replaceFirst(' ', 'T')
+      : rawText;
+  final parsedDateTime = DateTime.tryParse(normalizedText);
+  if (parsedDateTime != null) {
+    return parsedDateTime;
+  }
+
+  debugPrint('Timestamp 파싱 오류: $rawText');
+  return DateTime.now();
+}
+
+DateTime _dateTimeFromEpoch(int epochValue) {
+  final isMilliseconds = epochValue.abs() >= 1000000000000;
+  return DateTime.fromMillisecondsSinceEpoch(
+    isMilliseconds ? epochValue : epochValue * 1000,
+  );
 }
 
 class PatientUi {
@@ -1453,7 +1509,8 @@ class _LineChartPainter extends CustomPainter {
         final x = plot.left + plot.width * (i / (n - 1));
         final d = series.points[i].t;
         // 🚀 MM/DD HH:mm 형식으로 변경
-        final label = '${_fmt2(d.month)}/${_fmt2(d.day)} ${_fmt2(d.hour)}:${_fmt2(d.minute)}';
+        final label =
+            '${_fmt2(d.month)}/${_fmt2(d.day)} ${_fmt2(d.hour)}:${_fmt2(d.minute)}';
 
         tp.text = TextSpan(
           text: label,
@@ -1573,10 +1630,10 @@ class _LineChartPainter extends CustomPainter {
 
 // 🚀 확대 차트 화면 크기 자동 조절
 void _showChartFullScreen(
-    BuildContext context, {
-      required String title,
-      required _ChartSeries series,
-    }) {
+  BuildContext context, {
+  required String title,
+  required _ChartSeries series,
+}) {
   showDialog(
     context: context,
     barrierColor: const Color(0x99000000),
@@ -1585,81 +1642,81 @@ void _showChartFullScreen(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: LayoutBuilder(
-            builder: (context, constraints) {
-              // 🚀 화면 크기에 맞춰서 자동 조절
-              final dialogWidth = constraints.maxWidth - 32;
-              final chartWidth = dialogWidth - 36; // padding 고려
+          builder: (context, constraints) {
+            // 🚀 화면 크기에 맞춰서 자동 조절
+            final dialogWidth = constraints.maxWidth - 32;
+            final chartWidth = dialogWidth - 36; // padding 고려
 
-              return Container(
-                width: dialogWidth,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x1A000000),
-                      blurRadius: 18,
-                      offset: Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
+            return Container(
+              width: dialogWidth,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1A000000),
+                    blurRadius: 18,
+                    offset: Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const Spacer(),
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF374151),
+                          side: const BorderSide(color: Color(0xFFE5E7EB)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
                           ),
                         ),
-                        const Spacer(),
-                        OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF374151),
-                            side: const BorderSide(color: Color(0xFFE5E7EB)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                          ),
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text(
-                            '닫기',
-                            style: TextStyle(fontWeight: FontWeight.w900),
-                          ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text(
+                          '닫기',
+                          style: TextStyle(fontWeight: FontWeight.w900),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // 🚀 스크롤 제거, 화면에 맞춰서 표시
-                    SizedBox(
-                      height: 520,
-                      width: chartWidth,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: _InteractiveLineChart(series: series),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // 🚀 스크롤 제거, 화면에 맞춰서 표시
+                  SizedBox(
+                    height: 520,
+                    width: chartWidth,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: _InteractiveLineChart(series: series),
                     ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      '점을 터치하면 상세 정보가 표시됩니다.',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontWeight: FontWeight.w800,
-                      ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    '점을 터치하면 상세 정보가 표시됩니다.',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w800,
                     ),
-                  ],
-                ),
-              );
-            }
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       );
     },
