@@ -263,6 +263,18 @@ class _PressurePoint {
   const _PressurePoint(this.name, this.x, this.y, this.labelLeft);
 }
 
+class _PressureUlcerLogEntry {
+  final String dateText;
+  final String bodyPartName;
+  final int stage;
+
+  const _PressureUlcerLogEntry({
+    required this.dateText,
+    required this.bodyPartName,
+    required this.stage,
+  });
+}
+
 class _PressureUlcerInputTab extends StatefulWidget {
   const _PressureUlcerInputTab();
 
@@ -272,6 +284,9 @@ class _PressureUlcerInputTab extends StatefulWidget {
 
 class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
   final Map<String, int> _stages = {};
+  final List<_PressureUlcerLogEntry> _pressureUlcerLogs = [];
+  static const int _logRowsPerPage = 8;
+  int _currentLogPage = 1;
 
   static const _centerPoints = <String>{'후두부', '등', '엉치뼈', '좌골'};
   String? _activeCenterName;
@@ -311,22 +326,297 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 32),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       child: Column(
         children: [
-          SizedBox(
-            height: 600,
-            child: LayoutBuilder(
-              builder: (context, box) {
-                return _buildBody(box);
-              },
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 600,
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      return _buildBody(box);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                child: SizedBox(
+                  height: 600,
+                  child: _buildPressureUlcerLogPanel(),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           _buildPressureGraphs(),
         ],
       ),
     );
+  }
+
+  Widget _buildPressureUlcerLogPanel() {
+    final totalPages = _totalLogPages;
+    final visibleLogs = _visiblePressureUlcerLogs;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: const Color(0xFF6DC16A)),
+              ),
+              child: const Text(
+                '욕창 단계 내역',
+                style: TextStyle(
+                  color: Color(0xFF6DC16A),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 88,
+                  child: Text(
+                    '날짜',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    '부위별 단계',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 28),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+          Expanded(
+            child: visibleLogs.isEmpty
+                ? const Center(
+                    child: Text(
+                      '아직 입력된 욕창 단계 로그가 없습니다.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (final logEntry in visibleLogs)
+                        _buildPressureUlcerLogRow(logEntry),
+                    ],
+                  ),
+          ),
+          if (totalPages > 1) ...[
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
+            const SizedBox(height: 10),
+            _buildPagination(totalPages),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPressureUlcerLogRow(_PressureUlcerLogEntry logEntry) {
+    final absoluteIndex = _pressureUlcerLogs.indexOf(logEntry);
+
+    return Container(
+      height: 46,
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6))),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 88,
+            child: Text(
+              logEntry.dateText,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF374151),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              '${logEntry.bodyPartName} - ${logEntry.stage}단계',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF111827),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 28,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              tooltip: '삭제',
+              onPressed: absoluteIndex < 0
+                  ? null
+                  : () => _handleDeleteLog(absoluteIndex),
+              icon: const Icon(Icons.close, size: 16, color: Color(0xFF9CA3AF)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPagination(int totalPages) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          onPressed: _currentLogPage > 1
+              ? () {
+                  setState(() {
+                    _currentLogPage -= 1;
+                  });
+                }
+              : null,
+          icon: const Icon(Icons.chevron_left, size: 18),
+          color: const Color(0xFF6B7280),
+        ),
+        for (int pageNumber = 1; pageNumber <= totalPages; pageNumber++)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () {
+                setState(() {
+                  _currentLogPage = pageNumber;
+                });
+              },
+              child: Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _currentLogPage == pageNumber
+                      ? const Color(0xFFE5E7EB)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$pageNumber',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _currentLogPage == pageNumber
+                        ? const Color(0xFF111827)
+                        : const Color(0xFF6B7280),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        IconButton(
+          onPressed: _currentLogPage < totalPages
+              ? () {
+                  setState(() {
+                    _currentLogPage += 1;
+                  });
+                }
+              : null,
+          icon: const Icon(Icons.chevron_right, size: 18),
+          color: const Color(0xFF6B7280),
+        ),
+      ],
+    );
+  }
+
+  int get _totalLogPages {
+    if (_pressureUlcerLogs.isEmpty) {
+      return 1;
+    }
+
+    return (_pressureUlcerLogs.length / _logRowsPerPage).ceil();
+  }
+
+  List<_PressureUlcerLogEntry> get _visiblePressureUlcerLogs {
+    final startIndex = (_currentLogPage - 1) * _logRowsPerPage;
+    final endIndex = (startIndex + _logRowsPerPage).clamp(
+      0,
+      _pressureUlcerLogs.length,
+    );
+
+    if (startIndex < 0 || startIndex >= _pressureUlcerLogs.length) {
+      return const [];
+    }
+
+    return _pressureUlcerLogs.sublist(startIndex, endIndex);
+  }
+
+  void _appendPressureUlcerLog({
+    required String bodyPartName,
+    required int stage,
+  }) {
+    final now = DateTime.now();
+    final dateText =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+
+    _pressureUlcerLogs.insert(
+      0,
+      _PressureUlcerLogEntry(
+        dateText: dateText,
+        bodyPartName: bodyPartName,
+        stage: stage,
+      ),
+    );
+
+    _currentLogPage = 1;
+  }
+
+  void _handleDeleteLog(int logIndex) {
+    setState(() {
+      // TODO(suhyeon): 추후 API 연결 시 이 지점에서 삭제 API 호출 후 성공 시 remove 처리
+      _pressureUlcerLogs.removeAt(logIndex);
+
+      final totalPages = _totalLogPages;
+      if (_currentLogPage > totalPages) {
+        _currentLogPage = totalPages;
+      }
+    });
   }
 
   Widget _buildBody(BoxConstraints box) {
@@ -808,6 +1098,7 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
     if (result != null && result > 0) {
       setState(() {
         _stages[name] = result;
+        _appendPressureUlcerLog(bodyPartName: name, stage: result);
       });
     }
   }
@@ -869,91 +1160,202 @@ class _PressureGraphCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dates = ['1/1', '2/1', '3/1', '4/1'];
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      // color: const Color(0xFFFFFFFF),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: LineChart(
-              LineChartData(
-                minY: 0,
-                maxY: 4,
-                gridData: FlGridData(show: true),
-                titlesData: FlTitlesData(
-                  topTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 1,
-                      getTitlesWidget: (value, meta) {
-                        final index = value.toInt();
-                        if (index < 0 || index >= dates.length) {
-                          return const SizedBox.shrink();
-                        }
-                        return Text(
-                          dates[index],
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF6B7280),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 1,
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          value.toInt().toString(),
-                          style: const TextStyle(fontSize: 10),
-                        );
-                      },
-                    ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _showPressureGraphDialog(context, title),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: const [
-                      FlSpot(0, 1),
-                      FlSpot(1, 2.5),
-                      FlSpot(2, 1.2),
-                      FlSpot(3, 0.5),
-                    ],
-                    isCurved: true,
-                    barWidth: 2,
-                    color: const Color(0xFF4F83C1),
-                    dotData: FlDotData(show: true),
-                  ),
-                ],
-              ),
+                const Spacer(),
+                const Icon(
+                  Icons.open_in_full,
+                  size: 16,
+                  color: Color(0xFF9CA3AF),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Expanded(child: _buildPressureLineChart()),
+          ],
+        ),
       ),
     );
   }
+}
+
+void _showPressureGraphDialog(BuildContext context, String title) {
+  showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1080, maxHeight: 760),
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '$title 그래프',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: '닫기',
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              const SizedBox(height: 20),
+              const Expanded(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(8, 8, 20, 8),
+                  child: _PressureGraphExpandedView(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _PressureGraphExpandedView extends StatelessWidget {
+  const _PressureGraphExpandedView();
+
+  @override
+  Widget build(BuildContext context) {
+    return _buildPressureLineChart(
+      showLargeLabels: true,
+      lineWidth: 3,
+      dotRadius: 4,
+    );
+  }
+}
+
+Widget _buildPressureLineChart({
+  bool showLargeLabels = false,
+  double lineWidth = 2,
+  double dotRadius = 3,
+}) {
+  const dates = ['1/1', '2/1', '3/1', '4/1'];
+
+  return LineChart(
+    LineChartData(
+      minY: 0,
+      maxY: 4,
+      gridData: FlGridData(show: true),
+      titlesData: FlTitlesData(
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
+        ),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            interval: 1,
+            getTitlesWidget: (value, meta) {
+              final index = value.toInt();
+              if (index < 0 || index >= dates.length) {
+                return const SizedBox.shrink();
+              }
+              return Text(
+                dates[index],
+                style: TextStyle(
+                  fontSize: showLargeLabels ? 12 : 10,
+                  color: const Color(0xFF6B7280),
+                  fontWeight: showLargeLabels
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                ),
+              );
+            },
+          ),
+        ),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            interval: 1,
+            getTitlesWidget: (value, meta) {
+              return Text(
+                value.toInt().toString(),
+                style: TextStyle(
+                  fontSize: showLargeLabels ? 12 : 10,
+                  fontWeight: showLargeLabels
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+      borderData: FlBorderData(show: false),
+      lineBarsData: [
+        LineChartBarData(
+          spots: const [
+            FlSpot(0, 1),
+            FlSpot(1, 2.5),
+            FlSpot(2, 1.2),
+            FlSpot(3, 0.5),
+          ],
+          isCurved: true,
+          barWidth: lineWidth,
+          color: const Color(0xFF4F83C1),
+          dotData: FlDotData(
+            show: true,
+            getDotPainter: (spot, percent, barData, index) {
+              return FlDotCirclePainter(
+                radius: dotRadius,
+                color: const Color(0xFF4F83C1),
+                strokeWidth: 1.5,
+                strokeColor: Colors.white,
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 //욕창 단계정보

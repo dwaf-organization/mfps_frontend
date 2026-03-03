@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'week_meal_table.dart';
 import 'meal_status.dart';
 
@@ -10,20 +11,21 @@ class MealTab extends StatefulWidget {
 }
 
 class _MealTabState extends State<MealTab> {
-  // date → { '조식' | '중식' | '석식' → MealStatus }
+  // yyyy-MM-dd -> { '조식' | '중식' | '석식' -> MealStatus }
   final Map<String, Map<String, MealStatus>> _data = {};
+  late DateTime _selectedMonth;
 
   static const _meals = ['조식', '중식', '석식'];
 
-  static const _weeks = [
-    ['01/01', '01/02', '01/03', '01/04', '01/05', '01/06', '01/07'],
-    ['01/08', '01/09', '01/10', '01/11', '01/12', '01/13', '01/14'],
-    ['01/15', '01/16', '01/17', '01/18', '01/19', '01/20', '01/21'],
-    ['01/22', '01/23', '01/24', '01/25', '01/26', '01/27', '01/28'],
-  ];
-
   MealStatus _getStatus(String date, String meal) {
     return _data[date]?[meal] ?? MealStatus.before;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _selectedMonth = DateTime(now.year, now.month);
   }
 
   Future<void> _onDateTap(String date) async {
@@ -48,24 +50,335 @@ class _MealTabState extends State<MealTab> {
     }
   }
 
+  Future<void> _selectMonth() async {
+    final pickedMonth = await showDialog<DateTime>(
+      context: context,
+      builder: (context) {
+        return _MonthPickerDialog(initialMonth: _selectedMonth);
+      },
+    );
+
+    if (pickedMonth == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedMonth = DateTime(pickedMonth.year, pickedMonth.month);
+    });
+  }
+
+  void _moveMonth(int monthOffset) {
+    setState(() {
+      _selectedMonth = DateTime(
+        _selectedMonth.year,
+        _selectedMonth.month + monthOffset,
+      );
+    });
+  }
+
+  List<List<MealDateItem>> _buildWeeks() {
+    final lastDay = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+    final totalDays = lastDay.day;
+
+    final weeks = <List<MealDateItem>>[];
+    var currentWeek = <MealDateItem>[];
+
+    for (int day = 1; day <= totalDays; day++) {
+      final date = DateTime(_selectedMonth.year, _selectedMonth.month, day);
+      currentWeek.add(
+        MealDateItem(
+          key: _toStorageKey(date),
+          label:
+              '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}',
+        ),
+      );
+
+      if (currentWeek.length == 7 || day == totalDays) {
+        weeks.add(currentWeek);
+        currentWeek = <MealDateItem>[];
+      }
+    }
+
+    return weeks;
+  }
+
+  String _toStorageKey(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final monthText =
+        '${_selectedMonth.year}.${_selectedMonth.month.toString().padLeft(2, '0')}';
+    final weeks = _buildWeeks();
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset + 24),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: () => _moveMonth(-1),
+                  icon: const Icon(Icons.chevron_left),
+                  color: const Color(0xFF6B7280),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: _selectMonth,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF111827),
+                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: Text(
+                    '$monthText 월 선택',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () => _moveMonth(1),
+                  icon: const Icon(Icons.chevron_right),
+                  color: const Color(0xFF6B7280),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (final week in weeks)
+                  WeekMealTable(
+                    dates: week,
+                    getStatus: _getStatus,
+                    onDateTap: _onDateTap,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MonthPickerDialog extends StatefulWidget {
+  final DateTime initialMonth;
+
+  const _MonthPickerDialog({required this.initialMonth});
+
+  @override
+  State<_MonthPickerDialog> createState() => _MonthPickerDialogState();
+}
+
+class _MonthPickerDialogState extends State<_MonthPickerDialog> {
+  late int _selectedYear;
+  late int _selectedMonth;
+
+  static const _monthLabels = <String>[
+    '1월',
+    '2월',
+    '3월',
+    '4월',
+    '5월',
+    '6월',
+    '7월',
+    '8월',
+    '9월',
+    '10월',
+    '11월',
+    '12월',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedYear = widget.initialMonth.year;
+    _selectedMonth = widget.initialMonth.month;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
+        width: 420,
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
         decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
         ),
-        clipBehavior: Clip.antiAlias,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final week in _weeks)
-              WeekMealTable(
-                dates: week,
-                getStatus: _getStatus,
-                onDateTap: _onDateTap,
+            Row(
+              children: [
+                const Text(
+                  '월 선택',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: '닫기',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedYear -= 1;
+                    });
+                  },
+                  icon: const Icon(Icons.chevron_left),
+                  color: const Color(0xFF6B7280),
+                ),
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      '$_selectedYear년',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedYear += 1;
+                    });
+                  },
+                  icon: const Icon(Icons.chevron_right),
+                  color: const Color(0xFF6B7280),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _monthLabels.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 2.2,
               ),
+              itemBuilder: (context, index) {
+                final month = index + 1;
+                final isSelected = _selectedMonth == month;
+
+                return InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    setState(() {
+                      _selectedMonth = month;
+                    });
+                  },
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF6183EE)
+                          : const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFF6183EE)
+                            : const Color(0xFFE5E7EB),
+                      ),
+                    ),
+                    child: Text(
+                      _monthLabels[index],
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected
+                            ? Colors.white
+                            : const Color(0xFF374151),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF374151),
+                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    '취소',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(
+                      context,
+                    ).pop(DateTime(_selectedYear, _selectedMonth));
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6183EE),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    '선택',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
