@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:mfps/api/http_helper.dart';
+import 'package:mfps/url_config.dart';
 
 import 'week_meal_table.dart';
 import 'meal_status.dart';
 
 class MealTab extends StatefulWidget {
-  const MealTab({super.key});
+  final int patientCode;
+  const MealTab({super.key, required this.patientCode});
 
   @override
   State<MealTab> createState() => _MealTabState();
@@ -17,6 +20,18 @@ class _MealTabState extends State<MealTab> {
 
   static const _meals = ['조식', '중식', '석식'];
 
+  // intake_code → MealStatus 변환
+  static MealStatus _fromIntakeCode(int? code) {
+    switch (code) {
+      case 1:
+        return MealStatus.full;
+      case 5:
+        return MealStatus.miss;
+      default:
+        return MealStatus.before;
+    }
+  }
+
   MealStatus _getStatus(String date, String meal) {
     return _data[date]?[meal] ?? MealStatus.before;
   }
@@ -26,6 +41,50 @@ class _MealTabState extends State<MealTab> {
     super.initState();
     final now = DateTime.now();
     _selectedMonth = DateTime(now.year, now.month);
+    _fetchMealData(_selectedMonth);
+  }
+
+  Future<void> _fetchMealData(DateTime month) async {
+    final monthStr =
+        '${month.year}${month.month.toString().padLeft(2, '0')}';
+    try {
+      final uri = Uri.parse(
+        '${UrlConfig.serverUrl}/api/patient/meal/calendar'
+        '?patient_code=${widget.patientCode}&month=$monthStr',
+      );
+      final res = await HttpHelper.getJson(uri);
+      if (res['code'] != 1) return;
+      final data = res['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+
+      final records = data['meal_records'] as List<dynamic>? ?? [];
+      final newData = <String, Map<String, MealStatus>>{};
+
+      for (final raw in records) {
+        final record = raw as Map<String, dynamic>;
+        final date = record['record_date'] as String? ?? '';
+        if (date.isEmpty) continue;
+
+        Map<String, dynamic>? mealField(String key) =>
+            record[key] as Map<String, dynamic>?;
+
+        newData[date] = {
+          '조식': _fromIntakeCode(mealField('breakfast')?['intake_code'] as int?),
+          '중식': _fromIntakeCode(mealField('lunch')?['intake_code'] as int?),
+          '석식': _fromIntakeCode(mealField('dinner')?['intake_code'] as int?),
+        };
+      }
+
+      if (!mounted) return;
+      setState(() {
+        // 해당 월 데이터 교체
+        _data.removeWhere((key, _) => key.startsWith(
+            '${month.year}-${month.month.toString().padLeft(2, '0')}'));
+        _data.addAll(newData);
+      });
+    } catch (e) {
+      debugPrint('[MEAL_FETCH] error: $e');
+    }
   }
 
   Future<void> _onDateTap(String date) async {
@@ -46,8 +105,38 @@ class _MealTabState extends State<MealTab> {
     );
 
     if (updated != null) {
-      setState(() => _data[date] = updated);
+      await _saveMealData(date, updated);
     }
+  }
+
+  static int _toIntakeCode(MealStatus status) {
+    switch (status) {
+      case MealStatus.full:
+        return 1;
+      case MealStatus.miss:
+        return 5;
+      case MealStatus.before:
+        return 0;
+    }
+  }
+
+  Future<void> _saveMealData(
+      String date, Map<String, MealStatus> statuses) async {
+    try {
+      final uri = Uri.parse('${UrlConfig.serverUrl}/api/patient/meal');
+      await HttpHelper.postJson(uri, {
+        'patient_code': widget.patientCode,
+        'record_date': date,
+        'meals': {
+          'breakfast': _toIntakeCode(statuses['조식'] ?? MealStatus.before),
+          'lunch': _toIntakeCode(statuses['중식'] ?? MealStatus.before),
+          'dinner': _toIntakeCode(statuses['석식'] ?? MealStatus.before),
+        },
+      });
+    } catch (e) {
+      debugPrint('[MEAL_SAVE] error: $e');
+    }
+    await _fetchMealData(_selectedMonth);
   }
 
   Future<void> _selectMonth() async {
@@ -62,18 +151,18 @@ class _MealTabState extends State<MealTab> {
       return;
     }
 
-    setState(() {
-      _selectedMonth = DateTime(pickedMonth.year, pickedMonth.month);
-    });
+    final newMonth = DateTime(pickedMonth.year, pickedMonth.month);
+    setState(() => _selectedMonth = newMonth);
+    _fetchMealData(newMonth);
   }
 
   void _moveMonth(int monthOffset) {
-    setState(() {
-      _selectedMonth = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month + monthOffset,
-      );
-    });
+    final newMonth = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + monthOffset,
+    );
+    setState(() => _selectedMonth = newMonth);
+    _fetchMealData(newMonth);
   }
 
   List<List<MealDateItem>> _buildWeeks() {

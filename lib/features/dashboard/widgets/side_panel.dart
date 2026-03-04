@@ -11,8 +11,8 @@ import 'package:mfps/storage_keys.dart';
 
 import 'patient_list_card.dart';
 import 'dialogs/patient_add_dialog.dart';
-import 'dialogs/patient_detail_dialog.dart';
 import 'side_panel_action_button.dart';
+import '../pages/patient_detail_page.dart';
 
 enum PatientTab { all, danger, warning, stable }
 
@@ -296,18 +296,19 @@ class _SidePanelState extends State<SidePanel> {
                     selected: _selectedPatientCode == p.patientCode,
                     onTap: () async {
                       setState(() => _selectedPatientCode = p.patientCode);
-                      final ok = await showDialog<bool>(
-                        context: context,
-                        builder: (_) => PatientDetailDialog(
-                          patientCode: p.patientCode,
-                          roomLabel: p.patientRoom,
-                          bedLabel: p.patientBed,
-                          onRefresh: loadData,
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PatientDetailPage(
+                            patientCode: p.patientCode,
+                            roomLabel: p.patientRoom,
+                            bedLabel: p.patientBed,
+                            onRefresh: loadData,
+                          ),
                         ),
                       );
-                      if (ok == true) {
-                        await loadData();
-                      }
+                      setState(() => _selectedPatientCode = null);
+                      await loadData();
                     },
                   );
                 },
