@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:mfps/features/calender/widget/month_calendar.dart';
 
 class IncontinenceTab extends StatelessWidget {
-  const IncontinenceTab({super.key});
+  final int patientCode;
+  const IncontinenceTab({super.key, required this.patientCode});
 
   @override
   Widget build(BuildContext context) {
-    return const SingleChildScrollView(
-      padding: EdgeInsets.all(24),
-      child: MonthCalendar(),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: MonthCalendar(patientCode: patientCode),
     );
   }
 }

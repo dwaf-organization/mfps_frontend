@@ -39,7 +39,7 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
   int _serverTotalPages = 1;
   bool _isLoading = false;
   bool _isLogLoading = false;
-  Map<String, List<Map<String, dynamic>>> _chartData = {};
+  final Map<String, List<Map<String, dynamic>>> _chartData = {};
 
   static const _apiNameToPointName = <String, String>{
     '좌측 귀': '귀(좌)',
@@ -359,24 +359,26 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
           const SizedBox(height: 8),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
           Expanded(
-            child: visibleLogs.isEmpty
-                ? const Center(
-                    child: Text(
-                      '아직 입력된 욕창 단계 로그가 없습니다.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF9CA3AF),
+            child: _isLogLoading
+                ? const Center(child: CircularProgressIndicator())
+                : visibleLogs.isEmpty
+                    ? const Center(
+                        child: Text(
+                          '아직 입력된 욕창 단계 로그가 없습니다.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          for (final logEntry in visibleLogs)
+                            _buildPressureUlcerLogRow(logEntry),
+                        ],
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : Column(
-                    children: [
-                      for (final logEntry in visibleLogs)
-                        _buildPressureUlcerLogRow(logEntry),
-                    ],
-                  ),
           ),
           if (totalPages > 1) ...[
             const Divider(height: 1, color: Color(0xFFE5E7EB)),

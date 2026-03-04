@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:mfps/api/http_helper.dart';
+import 'package:mfps/url_config.dart';
 import 'incontinence_bottom_sheet.dart';
 
 class MonthCalendar extends StatefulWidget {
-  const MonthCalendar({super.key});
+  final int patientCode;
+  const MonthCalendar({super.key, required this.patientCode});
 
   @override
   State<MonthCalendar> createState() => _MonthCalendarState();
@@ -16,6 +19,52 @@ class _MonthCalendarState extends State<MonthCalendar> {
 
   DateTime _normalize(DateTime d) {
     return DateTime(d.year, d.month, d.day);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchIncontinenceData(_focusedMonth);
+  }
+
+  Future<void> _fetchIncontinenceData(DateTime month) async {
+    final monthStr =
+        '${month.year}${month.month.toString().padLeft(2, '0')}';
+    try {
+      final uri = Uri.parse(
+        '${UrlConfig.serverUrl}/api/patient/incontinence/calendar'
+        '?patient_code=${widget.patientCode}&month=$monthStr',
+      );
+      final res = await HttpHelper.getJson(uri);
+      if (res['code'] != 1) return;
+      final data = res['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+
+      final dates = (data['incontinence_dates'] as List<dynamic>? ?? [])
+          .map((e) {
+            final parts = (e as String).split('-');
+            if (parts.length < 3) return null;
+            return DateTime(
+              int.parse(parts[0]),
+              int.parse(parts[1]),
+              int.parse(parts[2]),
+            );
+          })
+          .whereType<DateTime>()
+          .toSet();
+
+      if (!mounted) return;
+      setState(() {
+        _incontinenceMap.removeWhere(
+          (d, _) => d.year == month.year && d.month == month.month,
+        );
+        for (final d in dates) {
+          _incontinenceMap[d] = true;
+        }
+      });
+    } catch (e) {
+      debugPrint('[INCONTINENCE_FETCH] error: $e');
+    }
   }
 
   void _onDateTap(DateTime date) async {
@@ -37,24 +86,40 @@ class _MonthCalendarState extends State<MonthCalendar> {
     );
 
     if (result != null) {
-      setState(() {
-        _incontinenceMap[normalized] = result;
-      });
+      await _saveIncontinenceData(normalized, result);
     }
+  }
+
+  Future<void> _saveIncontinenceData(DateTime date, bool hasIncontinence) async {
+    final recordDate =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    try {
+      final uri = Uri.parse('${UrlConfig.serverUrl}/api/patient/incontinence');
+      await HttpHelper.postJson(uri, {
+        'patient_code': widget.patientCode,
+        'record_date': recordDate,
+        'has_incontinence': hasIncontinence,
+        'notes': null,
+      });
+    } catch (e) {
+      debugPrint('[INCONTINENCE_SAVE] error: $e');
+    }
+    // 저장 성공 여부와 관계없이 해당 월 최신 데이터 반영
+    await _fetchIncontinenceData(_focusedMonth);
   }
 
   // 이전 달
   void _prevMonth() {
-    setState(() {
-      _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month - 1);
-    });
+    final prev = DateTime(_focusedMonth.year, _focusedMonth.month - 1);
+    setState(() => _focusedMonth = prev);
+    _fetchIncontinenceData(prev);
   }
 
   // 다음 달
   void _nextMonth() {
-    setState(() {
-      _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + 1);
-    });
+    final next = DateTime(_focusedMonth.year, _focusedMonth.month + 1);
+    setState(() => _focusedMonth = next);
+    _fetchIncontinenceData(next);
   }
 
   @override
@@ -181,7 +246,9 @@ class _CalendarCell extends StatelessWidget {
           color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFFE5E7EB),
+            color: isSelected
+                ? const Color(0xFF3B82F6)
+                : const Color(0xFFE5E7EB),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -203,11 +270,11 @@ class _CalendarCell extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         )
                       : isToday
-                          ? BoxDecoration(
-                              color: const Color(0xFF6DC16A),
-                              borderRadius: BorderRadius.circular(12),
-                            )
-                          : null,
+                      ? BoxDecoration(
+                          color: const Color(0xFF6DC16A),
+                          borderRadius: BorderRadius.circular(12),
+                        )
+                      : null,
                   child: Text(
                     '${date.day}',
                     style: TextStyle(
