@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import './dialogs/settings_dialog.dart';
 
 class TopHeader extends StatefulWidget {
@@ -135,6 +136,12 @@ class _TopHeaderState extends State<TopHeader> {
 
           const Spacer(),
 
+          _IconWithDot(
+            icon: Icons.notifications_outlined,
+            dot: false,
+            onTap: () => context.push('/notification'),
+          ),
+          const SizedBox(width: 4),
           _IconWithDot(
             icon: Icons.settings_outlined,
             dot: true,
