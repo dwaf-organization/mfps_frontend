@@ -122,7 +122,7 @@ lib/
 - `floorItems`
 - `_frontUrl`
 - `_isLoading`
-- `_selectedWard`
+- `_selectedWard` 
 
 피해야 할 예시:
 
