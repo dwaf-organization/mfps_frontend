@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:mfps/features/meal/meal_tab.dart';
 import 'package:mfps/features/calender/widget/month_calendar.dart';
+import 'package:mfps/url_config.dart';
+import 'package:mfps/api/http_helper.dart';
 
 /// 케어 입력 페이지 (욕창단계입력 / 욕창정보 / 식단 / 실금)
 class PatientCarePage extends StatefulWidget {
@@ -141,97 +143,104 @@ class _PatientCarePageState extends State<PatientCarePage>
               controller: _tabController,
               children: [
                 // 탭 1: 욕창단계입력
-                const _PressureUlcerInputTab(),
+                _PressureUlcerInputTab(patientCode: widget.patientCode),
 
                 // 탭 2: 욕창정보
-                SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 32),
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(
-                        top: 14,
-                        left: 24,
-                        right: 24,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: const Color(0xFF6DC16A),
-                              ),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // 헤더
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 16,
-                                  ),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF6DC16A),
-                                    borderRadius: BorderRadius.only(
-                                      topLeft: Radius.circular(18),
-                                      topRight: Radius.circular(18),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    '욕창 단계별 상세 특징',
-                                    style: TextStyle(
-                                      color: Color(0xFFFFFFFF),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                    ),
+                Builder(
+                  builder: (context) {
+                    final bottomInset = MediaQuery.of(context).padding.bottom;
+
+                    return SingleChildScrollView(
+                      padding: EdgeInsets.only(bottom: 32 + bottomInset + 24),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            top: 14,
+                            left: 24,
+                            right: 24,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: const Color(0xFF6DC16A),
                                   ),
                                 ),
+                                clipBehavior: Clip.antiAlias,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    // 헤더
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 16,
+                                      ),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF6DC16A),
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: Radius.circular(18),
+                                          topRight: Radius.circular(18),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        '욕창 단계별 상세 특징',
+                                        style: TextStyle(
+                                          color: Color(0xFFFFFFFF),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
 
-                                // 표 본문
-                                Column(
-                                  children: const [
-                                    StageRow(
-                                      title: '1단계(지속성 발적)',
-                                      description:
-                                          '피부 파괴는 없으나 붉거나 보라색으로 변하며,눌러도 창백해지지 않는 상태입니다. 주변 피부보다 따뜻하거나 단단하며, 통증이 있을 수 있습니다.',
-                                      diagramAsset:
-                                          'assets/images/stage1_diagram.png',
-                                    ),
-                                    StageRow(
-                                      title: '2단계(부분층 피부 손상)',
-                                      description:
-                                          '표피와 진피 일부가 파열된 상태로 물집(수포)이 생기거나 피부가 벗겨집니다. 얕은 궤양 형태이며 분홍색이나 붉은색을 띱니다.',
-                                      diagramAsset:
-                                          'assets/images/stage2_diagram.png',
-                                    ),
-                                    StageRow(
-                                      title: '3단계 (전층 피부 손상)',
-                                      description:
-                                          '피부 전층이 파괴되어 피하지방 조직까지 노출됩니다. 둥글게 파인 형태를 띠며, 괴사 조직과 심한 악취를 동반한 삼출물이 나타날 수 있습니다.',
-                                      diagramAsset:
-                                          'assets/images/stage3_diagram.png',
-                                    ),
-                                    StageRow(
-                                      title: '4단계 (광범위한 조직 손상)',
-                                      description:
-                                          '피부 전층뿐만 아니라 근육, 힘줄, 뼈까지 노출될 정도로 깊은 손상이 발생합니다. 괴사 조직 제거 및 봉합 등 적극적인 수술적 치료가 필요합니다.',
-                                      diagramAsset:
-                                          'assets/images/stage4_diagram.png',
-                                      showBottomBorder: false,
+                                    // 표 본문
+                                    Column(
+                                      children: const [
+                                        StageRow(
+                                          title: '1단계(지속성 발적)',
+                                          description:
+                                              '피부 파괴는 없으나 붉거나 보라색으로 변하며,눌러도 창백해지지 않는 상태입니다. 주변 피부보다 따뜻하거나 단단하며, 통증이 있을 수 있습니다.',
+                                          diagramAsset:
+                                              'assets/images/stage1_diagram.png',
+                                        ),
+                                        StageRow(
+                                          title: '2단계(부분층 피부 손상)',
+                                          description:
+                                              '표피와 진피 일부가 파열된 상태로 물집(수포)이 생기거나 피부가 벗겨집니다. 얕은 궤양 형태이며 분홍색이나 붉은색을 띱니다.',
+                                          diagramAsset:
+                                              'assets/images/stage2_diagram.png',
+                                        ),
+                                        StageRow(
+                                          title: '3단계 (전층 피부 손상)',
+                                          description:
+                                              '피부 전층이 파괴되어 피하지방 조직까지 노출됩니다. 둥글게 파인 형태를 띠며, 괴사 조직과 심한 악취를 동반한 삼출물이 나타날 수 있습니다.',
+                                          diagramAsset:
+                                              'assets/images/stage3_diagram.png',
+                                        ),
+                                        StageRow(
+                                          title: '4단계 (광범위한 조직 손상)',
+                                          description:
+                                              '피부 전층뿐만 아니라 근육, 힘줄, 뼈까지 노출될 정도로 깊은 손상이 발생합니다. 괴사 조직 제거 및 봉합 등 적극적인 수술적 치료가 필요합니다.',
+                                          diagramAsset:
+                                              'assets/images/stage4_diagram.png',
+                                          showBottomBorder: false,
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
 
                 // 탭 3: 식단
@@ -263,8 +272,23 @@ class _PressurePoint {
   const _PressurePoint(this.name, this.x, this.y, this.labelLeft);
 }
 
+class _PressureUlcerLogEntry {
+  final int? historyId;
+  final String dateText;
+  final String bodyPartName;
+  final int stage;
+
+  const _PressureUlcerLogEntry({
+    this.historyId,
+    required this.dateText,
+    required this.bodyPartName,
+    required this.stage,
+  });
+}
+
 class _PressureUlcerInputTab extends StatefulWidget {
-  const _PressureUlcerInputTab();
+  final int patientCode;
+  const _PressureUlcerInputTab({required this.patientCode});
 
   @override
   State<_PressureUlcerInputTab> createState() => _PressureUlcerInputTabState();
@@ -272,6 +296,194 @@ class _PressureUlcerInputTab extends StatefulWidget {
 
 class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
   final Map<String, int> _stages = {};
+  final Map<String, String> _notes = {};
+  final List<_PressureUlcerLogEntry> _pressureUlcerLogs = [];
+  static const int _logRowsPerPage = 8;
+  int _currentLogPage = 1;
+  int _serverTotalPages = 1;
+  bool _isLoading = false;
+  bool _isLogLoading = false;
+  Map<String, List<Map<String, dynamic>>> _chartData = {};
+
+  // 차트 API 부위명 ↔ 화면 포인트 이름 매핑
+  static const _apiNameToPointName = <String, String>{
+    '좌측 귀': '귀(좌)',
+    '우측 귀': '귀(우)',
+    '후두부': '후두부',
+    '좌측 어깨뼈': '어깨뼈(좌)',
+    '우측 어깨뼈': '어깨뼈(우)',
+    '등': '등',
+    '엉치뼈': '엉치뼈',
+    '좌골': '좌골',
+    '좌측 엉덩이옆': '엉덩이옆(좌)',
+    '우측 엉덩이옆': '엉덩이옆(우)',
+    '좌측 무릎': '무릎(좌)',
+    '우측 무릎': '무릎(우)',
+    '좌측 복숭아뼈': '복숭아뼈(좌)',
+    '우측 복숭아뼈': '복숭아뼈(우)',
+    '좌측 뒤꿈치': '뒷꿈치(좌)',
+    '우측 뒤꿈치': '뒷꿈치(우)',
+  };
+
+  // part_code(서버) ↔ 화면 포인트 이름 매핑
+  static const _partCodeToPointName = <int, String>{
+    1: '귀(좌)',
+    2: '귀(우)',
+    3: '후두부',
+    4: '어깨뼈(좌)',
+    5: '어깨뼈(우)',
+    6: '등',
+    7: '엉치뼈',
+    8: '좌골',
+    9: '엉덩이옆(좌)',
+    10: '엉덩이옆(우)',
+    11: '무릎(좌)',
+    12: '무릎(우)',
+    13: '복숭아뼈(좌)',
+    14: '복숭아뼈(우)',
+    15: '뒷꿈치(좌)',
+    16: '뒷꿈치(우)',
+  };
+
+  static const _pointNameToPartCode = <String, int>{
+    '귀(좌)': 1,
+    '귀(우)': 2,
+    '후두부': 3,
+    '어깨뼈(좌)': 4,
+    '어깨뼈(우)': 5,
+    '등': 6,
+    '엉치뼈': 7,
+    '좌골': 8,
+    '엉덩이옆(좌)': 9,
+    '엉덩이옆(우)': 10,
+    '무릎(좌)': 11,
+    '무릎(우)': 12,
+    '복숭아뼈(좌)': 13,
+    '복숭아뼈(우)': 14,
+    '뒷꿈치(좌)': 15,
+    '뒷꿈치(우)': 16,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCurrentUlcerState();
+    _fetchChartData();
+    _fetchLogHistory();
+  }
+
+  Future<void> _fetchLogHistory({int page = 1}) async {
+    setState(() => _isLogLoading = true);
+    try {
+      final uri = Uri.parse(
+        '${UrlConfig.serverUrl}/api/patient/ulcer/history'
+        '?patient_code=${widget.patientCode}&page=$page&size=$_logRowsPerPage',
+      );
+      final res = await HttpHelper.getJson(uri);
+      if (res['code'] != 1) return;
+      final data = res['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+
+      final itemsRaw = data['records'] as List<dynamic>? ?? const [];
+
+      final entries = itemsRaw.map((raw) {
+        final item = raw as Map<String, dynamic>;
+        return _PressureUlcerLogEntry(
+          historyId: item['history_code'] as int?,
+          dateText: item['record_date'] as String? ?? '',
+          bodyPartName: item['part_name'] as String? ?? '',
+          stage: item['stage_level'] as int? ?? 0,
+        );
+      }).toList();
+
+      final serverTotalPages = data['total_pages'] as int? ?? 1;
+
+      if (!mounted) return;
+      setState(() {
+        _serverTotalPages = serverTotalPages;
+        _currentLogPage = page;
+        _pressureUlcerLogs
+          ..clear()
+          ..addAll(entries);
+      });
+    } catch (e) {
+      debugPrint('[ULCER_LOG_FETCH] error: $e');
+    } finally {
+      if (mounted) setState(() => _isLogLoading = false);
+    }
+  }
+
+  Future<void> _fetchChartData() async {
+    try {
+      final uri = Uri.parse(
+        '${UrlConfig.serverUrl}/api/patient/ulcer/history/chart?patient_code=${widget.patientCode}',
+      );
+      final res = await HttpHelper.getJson(uri);
+      if (res['code'] != 1) return;
+      final data = res['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+      final raw = data['chart_data'] as Map<String, dynamic>?;
+      if (raw == null) return;
+
+      final newChartData = <String, List<Map<String, dynamic>>>{};
+      for (final entry in raw.entries) {
+        final localName = _apiNameToPointName[entry.key];
+        if (localName == null) continue;
+        newChartData[localName] =
+            (entry.value as List).cast<Map<String, dynamic>>();
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _chartData
+          ..clear()
+          ..addAll(newChartData);
+      });
+    } catch (e) {
+      debugPrint('[ULCER_CHART_FETCH] error: $e');
+    }
+  }
+
+  Future<void> _fetchCurrentUlcerState() async {
+    setState(() => _isLoading = true);
+    try {
+      final uri = Uri.parse(
+        '${UrlConfig.serverUrl}/api/patient/ulcer/history/current?patient_code=${widget.patientCode}',
+      );
+      final res = await HttpHelper.getJson(uri);
+      if (res['code'] != 1) return;
+      final dataList = res['data'] as List?;
+      if (dataList == null) return;
+
+      final newStages = <String, int>{};
+      final newNotes = <String, String>{};
+      for (final raw in dataList) {
+        final item = raw as Map<String, dynamic>;
+        final partCode = item['part_code'] as int?;
+        final stageLevel = item['stage_level'] as int?;
+        if (partCode == null || stageLevel == null || stageLevel == 0) continue;
+        final pointName = _partCodeToPointName[partCode];
+        if (pointName == null) continue;
+        newStages[pointName] = stageLevel;
+        final note = item['notes'] as String?;
+        if (note != null && note.isNotEmpty) newNotes[pointName] = note;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _stages
+          ..clear()
+          ..addAll(newStages);
+        _notes
+          ..clear()
+          ..addAll(newNotes);
+      });
+    } catch (e) {
+      debugPrint('[ULCER_FETCH] error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   static const _centerPoints = <String>{'후두부', '등', '엉치뼈', '좌골'};
   String? _activeCenterName;
@@ -310,23 +522,262 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 32),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       child: Column(
         children: [
-          SizedBox(
-            height: 600,
-            child: LayoutBuilder(
-              builder: (context, box) {
-                return _buildBody(box);
-              },
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 600,
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      return _buildBody(box);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                child: SizedBox(
+                  height: 600,
+                  child: _buildPressureUlcerLogPanel(),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           _buildPressureGraphs(),
         ],
       ),
     );
+  }
+
+  Widget _buildPressureUlcerLogPanel() {
+    final totalPages = _totalLogPages;
+    final visibleLogs = _visiblePressureUlcerLogs;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: const Color(0xFF6DC16A)),
+              ),
+              child: const Text(
+                '욕창 단계 내역',
+                style: TextStyle(
+                  color: Color(0xFF6DC16A),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 88,
+                  child: Text(
+                    '날짜',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    '부위별 단계',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 28),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+          Expanded(
+            child: visibleLogs.isEmpty
+                ? const Center(
+                    child: Text(
+                      '아직 입력된 욕창 단계 로그가 없습니다.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (final logEntry in visibleLogs)
+                        _buildPressureUlcerLogRow(logEntry),
+                    ],
+                  ),
+          ),
+          if (totalPages > 1) ...[
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
+            const SizedBox(height: 10),
+            _buildPagination(totalPages),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPressureUlcerLogRow(_PressureUlcerLogEntry logEntry) {
+    return Container(
+      height: 46,
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6))),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 88,
+            child: Text(
+              logEntry.dateText,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF374151),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              '${logEntry.bodyPartName} - ${logEntry.stage}단계',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF111827),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 28,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              tooltip: '삭제',
+              onPressed: () => _handleDeleteLog(logEntry),
+              icon: const Icon(Icons.close, size: 16, color: Color(0xFF9CA3AF)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPagination(int totalPages) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          onPressed: _currentLogPage > 1
+              ? () => _fetchLogHistory(page: _currentLogPage - 1)
+              : null,
+          icon: const Icon(Icons.chevron_left, size: 18),
+          color: const Color(0xFF6B7280),
+        ),
+        for (int pageNumber = 1; pageNumber <= totalPages; pageNumber++)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => _fetchLogHistory(page: pageNumber),
+              child: Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _currentLogPage == pageNumber
+                      ? const Color(0xFFE5E7EB)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$pageNumber',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _currentLogPage == pageNumber
+                        ? const Color(0xFF111827)
+                        : const Color(0xFF6B7280),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        IconButton(
+          onPressed: _currentLogPage < totalPages
+              ? () => _fetchLogHistory(page: _currentLogPage + 1)
+              : null,
+          icon: const Icon(Icons.chevron_right, size: 18),
+          color: const Color(0xFF6B7280),
+        ),
+      ],
+    );
+  }
+
+  // 서버가 내려주는 total_pages 직접 사용
+  int get _totalLogPages => _serverTotalPages.clamp(1, 9999);
+
+  // API가 현재 페이지 데이터만 반환하므로 전체를 그대로 표시
+  List<_PressureUlcerLogEntry> get _visiblePressureUlcerLogs =>
+      _pressureUlcerLogs;
+
+  Future<void> _handleDeleteLog(_PressureUlcerLogEntry logEntry) async {
+    final historyCode = logEntry.historyId;
+    if (historyCode == null) return;
+
+    try {
+      final uri = Uri.parse(
+        '${UrlConfig.serverUrl}/api/patient/ulcer/history/$historyCode',
+      );
+      final res = await HttpHelper.sendJson('DELETE', uri);
+      if (res['code'] != 1) return;
+    } catch (e) {
+      debugPrint('[ULCER_DELETE] error: $e');
+      return;
+    }
+
+    // 삭제 성공 후 내역·현재상태·그래프 모두 갱신
+    final targetPage =
+        _pressureUlcerLogs.length == 1 && _currentLogPage > 1
+            ? _currentLogPage - 1
+            : _currentLogPage;
+    _fetchLogHistory(page: targetPage);
+    _fetchCurrentUlcerState();
+    _fetchChartData();
   }
 
   Widget _buildBody(BoxConstraints box) {
@@ -599,13 +1050,18 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
         ),
         itemBuilder: (context, index) {
           final part = parts[index];
-          return _PressureGraphCard(title: part);
+          return _PressureGraphCard(
+            title: part,
+            chartData: _chartData[part] ?? [],
+          );
         },
       ),
     );
   }
 
   Future<void> _showStageMenu(String name, Offset globalPos) async {
+    String? capturedNote;
+
     final result = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
@@ -616,14 +1072,15 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        final remarkCtrl = TextEditingController();
+        final remarkCtrl = TextEditingController(text: _notes[name] ?? '');
         int? selectedStage = _stages[name];
 
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final keyboardH = MediaQuery.of(context).viewInsets.bottom;
             return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + keyboardH),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -677,24 +1134,20 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                     Wrap(
                       spacing: 12,
                       runSpacing: 12,
-                      children: List.generate(4, (index) {
-                        final stage = index + 1;
-                        final isSelected = selectedStage == stage;
-
-                        return OutlinedButton(
+                      children: [
+                        // 없음 버튼 (0단계)
+                        OutlinedButton(
                           onPressed: () {
-                            setSheetState(() {
-                              selectedStage = stage;
-                            });
+                            setSheetState(() => selectedStage = 0);
                           },
                           style: OutlinedButton.styleFrom(
-                            backgroundColor: isSelected
-                                ? const Color(0xFF6183EE)
+                            backgroundColor: selectedStage == 0
+                                ? const Color(0xFF6B7280)
                                 : Colors.white,
-                            foregroundColor: isSelected
+                            foregroundColor: selectedStage == 0
                                 ? Colors.white
-                                : const Color(0xFF374151),
-                            side: const BorderSide(color: Color(0xFF6183EE)),
+                                : const Color(0xFF6B7280),
+                            side: const BorderSide(color: Color(0xFF6B7280)),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
                               vertical: 14,
@@ -703,12 +1156,42 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          child: Text(
-                            '$stage단계',
-                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          child: const Text(
+                            '없음',
+                            style: TextStyle(fontWeight: FontWeight.w500),
                           ),
-                        );
-                      }),
+                        ),
+                        // 1~4단계 버튼
+                        ...List.generate(4, (index) {
+                          final stage = index + 1;
+                          final isSelected = selectedStage == stage;
+                          return OutlinedButton(
+                            onPressed: () {
+                              setSheetState(() => selectedStage = stage);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: isSelected
+                                  ? const Color(0xFF6183EE)
+                                  : Colors.white,
+                              foregroundColor: isSelected
+                                  ? Colors.white
+                                  : const Color(0xFF374151),
+                              side: const BorderSide(color: Color(0xFF6183EE)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              '$stage단계',
+                              style: const TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                          );
+                        }),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -774,7 +1257,37 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                         ),
                         const SizedBox(width: 10),
                         ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
+                            if (selectedStage == null) {
+                              Navigator.pop(context);
+                              return;
+                            }
+                            final partCode = _pointNameToPartCode[name];
+                            if (partCode != null) {
+                              try {
+                                final now = DateTime.now();
+                                final recordDate =
+                                    '${now.year.toString().padLeft(4, '0')}-'
+                                    '${now.month.toString().padLeft(2, '0')}-'
+                                    '${now.day.toString().padLeft(2, '0')}';
+                                final uri = Uri.parse(
+                                  '${UrlConfig.serverUrl}/api/patient/ulcer/history',
+                                );
+                                await HttpHelper.postJson(uri, {
+                                  'patient_code': widget.patientCode,
+                                  'record_date': recordDate,
+                                  'part_code': partCode,
+                                  'stage_code': selectedStage,
+                                  'notes': remarkCtrl.text.trim().isEmpty
+                                      ? null
+                                      : remarkCtrl.text.trim(),
+                                });
+                                capturedNote = remarkCtrl.text.trim();
+                              } catch (e) {
+                                debugPrint('[ULCER_SAVE] error: $e');
+                              }
+                            }
+                            if (!context.mounted) return;
                             Navigator.pop(context, selectedStage);
                           },
                           style: ElevatedButton.styleFrom(
@@ -805,10 +1318,23 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
       },
     );
 
-    if (result != null && result > 0) {
+    if (result != null) {
       setState(() {
-        _stages[name] = result;
+        if (result == 0) {
+          // 없음 선택 시 해당 부위 초기화
+          _stages.remove(name);
+          _notes.remove(name);
+        } else {
+          _stages[name] = result;
+          if (capturedNote != null && capturedNote!.isNotEmpty) {
+            _notes[name] = capturedNote!;
+          } else {
+            _notes.remove(name);
+          }
+        }
       });
+      _fetchLogHistory(page: 1);
+      _fetchChartData();
     }
   }
 }
@@ -864,96 +1390,239 @@ class _ConnectionLinePainter extends CustomPainter {
 
 class _PressureGraphCard extends StatelessWidget {
   final String title;
+  final List<Map<String, dynamic>> chartData;
 
-  const _PressureGraphCard({required this.title});
+  const _PressureGraphCard({required this.title, required this.chartData});
 
   @override
   Widget build(BuildContext context) {
-    final dates = ['1/1', '2/1', '3/1', '4/1'];
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      // color: const Color(0xFFFFFFFF),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: LineChart(
-              LineChartData(
-                minY: 0,
-                maxY: 4,
-                gridData: FlGridData(show: true),
-                titlesData: FlTitlesData(
-                  topTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 1,
-                      getTitlesWidget: (value, meta) {
-                        final index = value.toInt();
-                        if (index < 0 || index >= dates.length) {
-                          return const SizedBox.shrink();
-                        }
-                        return Text(
-                          dates[index],
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF6B7280),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 1,
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          value.toInt().toString(),
-                          style: const TextStyle(fontSize: 10),
-                        );
-                      },
-                    ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _showPressureGraphDialog(context, title, chartData),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: const [
-                      FlSpot(0, 1),
-                      FlSpot(1, 2.5),
-                      FlSpot(2, 1.2),
-                      FlSpot(3, 0.5),
-                    ],
-                    isCurved: true,
-                    barWidth: 2,
-                    color: const Color(0xFF4F83C1),
-                    dotData: FlDotData(show: true),
-                  ),
-                ],
-              ),
+                const Spacer(),
+                const Icon(
+                  Icons.open_in_full,
+                  size: 16,
+                  color: Color(0xFF9CA3AF),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Expanded(child: _buildPressureLineChart(chartData: chartData)),
+          ],
+        ),
       ),
     );
   }
+}
+
+void _showPressureGraphDialog(
+  BuildContext context,
+  String title,
+  List<Map<String, dynamic>> chartData,
+) {
+  showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1080, maxHeight: 760),
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '$title 그래프',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: '닫기',
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              const SizedBox(height: 20),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 20, 8),
+                  child: _PressureGraphExpandedView(chartData: chartData),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _PressureGraphExpandedView extends StatelessWidget {
+  final List<Map<String, dynamic>> chartData;
+  const _PressureGraphExpandedView({required this.chartData});
+
+  @override
+  Widget build(BuildContext context) {
+    return _buildPressureLineChart(
+      chartData: chartData,
+      showLargeLabels: true,
+      lineWidth: 3,
+      dotRadius: 4,
+    );
+  }
+}
+
+Color _ulcerStageColor(int maxStage) {
+  const colors = [
+    Color(0xFFD1D5DB), // 데이터 없음 — gray
+    Color(0xFFFCA5A5), // 1단계 — light pink
+    Color(0xFFF87171), // 2단계 — medium red
+    Color(0xFFEF4444), // 3단계 — strong red
+    Color(0xFFB91C1C), // 4단계 — dark red
+  ];
+  if (maxStage < 1 || maxStage > 4) return colors[0];
+  return colors[maxStage];
+}
+
+Widget _buildPressureLineChart({
+  required List<Map<String, dynamic>> chartData,
+  bool showLargeLabels = false,
+  double lineWidth = 2,
+  double dotRadius = 3,
+}) {
+  // 데이터 없음 → (0, 0) 단일 점으로 표시 (0단계와 동일한 회색)
+  final effectiveData = chartData.isEmpty
+      ? [<String, dynamic>{'date': '', 'stage_level': 0}]
+      : chartData;
+
+  final spots = <FlSpot>[
+    for (int i = 0; i < effectiveData.length; i++)
+      FlSpot(i.toDouble(),
+          (effectiveData[i]['stage_level'] as int? ?? 0).toDouble()),
+  ];
+
+  // 가장 최근(마지막) 항목의 단계 기준으로 색상 결정 (0 → 회색)
+  final latestStage = effectiveData.last['stage_level'] as int? ?? 0;
+  final lineColor = _ulcerStageColor(latestStage);
+
+  final dates = effectiveData.map((e) {
+    final raw = e['date'] as String? ?? '';
+    final parts = raw.split('-');
+    return parts.length >= 3 ? '${parts[1]}/${parts[2]}' : '—';
+  }).toList();
+
+  return LineChart(
+    LineChartData(
+      minY: 0,
+      maxY: 4,
+      gridData: FlGridData(show: true),
+      titlesData: FlTitlesData(
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
+        ),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            interval: 1,
+            getTitlesWidget: (value, meta) {
+              final index = value.toInt();
+              if (index < 0 || index >= dates.length) {
+                return const SizedBox.shrink();
+              }
+              return Text(
+                dates[index],
+                style: TextStyle(
+                  fontSize: showLargeLabels ? 12 : 10,
+                  color: const Color(0xFF6B7280),
+                  fontWeight:
+                      showLargeLabels ? FontWeight.w700 : FontWeight.w500,
+                ),
+              );
+            },
+          ),
+        ),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            interval: 1,
+            getTitlesWidget: (value, meta) {
+              return Text(
+                value.toInt().toString(),
+                style: TextStyle(
+                  fontSize: showLargeLabels ? 12 : 10,
+                  fontWeight:
+                      showLargeLabels ? FontWeight.w700 : FontWeight.w500,
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+      borderData: FlBorderData(show: false),
+      lineBarsData: [
+        LineChartBarData(
+          spots: spots,
+          isCurved: true,
+          barWidth: lineWidth,
+          color: lineColor,
+          dotData: FlDotData(
+            show: true,
+            getDotPainter: (spot, percent, barData, index) {
+              return FlDotCirclePainter(
+                radius: dotRadius,
+                color: lineColor,
+                strokeWidth: 1.5,
+                strokeColor: Colors.white,
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 //욕창 단계정보

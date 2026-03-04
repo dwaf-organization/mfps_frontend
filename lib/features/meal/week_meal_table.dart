@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
+
 import 'meal_row.dart';
 import 'meal_status.dart';
 
+class MealDateItem {
+  final String key;
+  final String label;
+
+  const MealDateItem({required this.key, required this.label});
+}
+
 class WeekMealTable extends StatelessWidget {
-  final List<String> dates;
+  final List<MealDateItem> dates;
   final MealStatus Function(String date, String mealType) getStatus;
   final void Function(String date) onDateTap;
 
@@ -21,18 +29,18 @@ class WeekMealTable extends StatelessWidget {
         _header(),
         MealRow(
           title: '조식',
-          statuses: dates.map((d) => getStatus(d, '조식')).toList(),
-          onCellTap: (i) => onDateTap(dates[i]),
+          statuses: dates.map((date) => getStatus(date.key, '조식')).toList(),
+          onCellTap: (i) => onDateTap(dates[i].key),
         ),
         MealRow(
           title: '중식',
-          statuses: dates.map((d) => getStatus(d, '중식')).toList(),
-          onCellTap: (i) => onDateTap(dates[i]),
+          statuses: dates.map((date) => getStatus(date.key, '중식')).toList(),
+          onCellTap: (i) => onDateTap(dates[i].key),
         ),
         MealRow(
           title: '석식',
-          statuses: dates.map((d) => getStatus(d, '석식')).toList(),
-          onCellTap: (i) => onDateTap(dates[i]),
+          statuses: dates.map((date) => getStatus(date.key, '석식')).toList(),
+          onCellTap: (i) => onDateTap(dates[i].key),
         ),
       ],
     );
@@ -42,7 +50,9 @@ class WeekMealTable extends StatelessWidget {
     return Row(
       children: [
         SizedBox(width: 80, child: _cell('구분', isHeader: true)),
-        ...dates.map((d) => Expanded(child: _cell(d, isHeader: true))),
+        ...dates.map(
+          (date) => Expanded(child: _cell(date.label, isHeader: true)),
+        ),
       ],
     );
   }

@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../urlConfig.dart';
-import '../../../../storage_keys.dart';
+import 'package:mfps/url_config.dart';
+import 'package:mfps/storage_keys.dart';
 
 // ✅ 쿠키 세션 유지되는 http helper
-import '../../../../api/http_helper.dart';
+import 'package:mfps/api/http_helper.dart';
 
 enum SettingsSection {
   accountInfo, // 회원정보
@@ -54,7 +54,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   @override
   void initState() {
     super.initState();
-    _baseUrl = Urlconfig.serverUrl.toString();
+    _baseUrl = UrlConfig.serverUrl.toString();
     loadData(); // 기본: 회원정보 탭 데이터 로드
   }
 

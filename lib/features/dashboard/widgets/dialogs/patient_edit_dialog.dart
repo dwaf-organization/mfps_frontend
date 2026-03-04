@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-import '../../../../urlConfig.dart';
-import '../../../../storage_keys.dart';
+import 'package:mfps/url_config.dart';
+import 'package:mfps/storage_keys.dart';
 
 class PatientEditDialog extends StatefulWidget {
   final int patientCode;
@@ -70,7 +70,7 @@ class _PatientEditDialogState extends State<PatientEditDialog> {
   @override
   void initState() {
     super.initState();
-    _baseUrl = Urlconfig.serverUrl.toString();
+    _baseUrl = UrlConfig.serverUrl.toString();
     _currentBedCode = widget.fromBedCode;
     loadData();
   }

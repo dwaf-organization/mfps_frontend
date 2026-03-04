@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-import '../../../../urlConfig.dart';
-import '../../../../storage_keys.dart';
+import 'package:mfps/url_config.dart';
+import 'package:mfps/storage_keys.dart';
 
 class PatientAddDialog extends StatefulWidget {
   final int? prefillBedCode; // 침대 hospital_st_code (bed_code)
@@ -40,7 +40,7 @@ class _PatientAddDialogState extends State<PatientAddDialog> {
   static const _cGray700 = Color(0xFF374151);
   static const _cGray500 = Color(0xFF6B7280);
 
-  String get _baseUrl => Urlconfig.serverUrl;
+  String get _baseUrl => UrlConfig.serverUrl;
 
   // =========================
   // Controllers (기본/진료)

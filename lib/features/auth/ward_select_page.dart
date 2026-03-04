@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../urlConfig.dart';
-import '../../../../storage_keys.dart';
+import 'package:mfps/url_config.dart';
+import 'package:mfps/storage_keys.dart';
 
-import '../../api/http_helper.dart';
+import 'package:mfps/api/http_helper.dart';
 
 /// =======================
 /// Models
@@ -22,12 +22,12 @@ class WardItem {
     required this.sortOrder,
   });
 
-  factory WardItem.fromJson(Map<String, dynamic> j) {
+  factory WardItem.fromJson(Map<String, dynamic> json) {
     return WardItem(
       hospitalStCode:
-          int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? 0,
-      categoryName: (j['category_name'] ?? '').toString(),
-      sortOrder: int.tryParse(j['sort_order']?.toString() ?? '') ?? 0,
+          int.tryParse(json['hospital_st_code']?.toString() ?? '') ?? 0,
+      categoryName: (json['category_name'] ?? '').toString(),
+      sortOrder: int.tryParse(json['sort_order']?.toString() ?? '') ?? 0,
     );
   }
 
@@ -51,33 +51,33 @@ class FloorItem {
     required this.sortOrder,
   });
 
-  factory FloorItem.fromJson(Map<String, dynamic> j) {
+  factory FloorItem.fromJson(Map<String, dynamic> json) {
     return FloorItem(
       hospitalFlCode:
-          int.tryParse(j['hospital_fl_code']?.toString() ?? '') ?? 0,
+          int.tryParse(json['hospital_fl_code']?.toString() ?? '') ?? 0,
       hospitalStCode:
-          int.tryParse(j['hospital_st_code']?.toString() ?? '') ?? 0,
-      floorName: (j['floor_name'] ?? j['category_name'] ?? '').toString(),
-      sortOrder: int.tryParse(j['sort_order']?.toString() ?? '') ?? 0,
+          int.tryParse(json['hospital_st_code']?.toString() ?? '') ?? 0,
+      floorName: (json['floor_name'] ?? json['category_name'] ?? '').toString(),
+      sortOrder: int.tryParse(json['sort_order']?.toString() ?? '') ?? 0,
     );
   }
 }
 
 /// =======================
-/// Screen
+/// Page
 /// =======================
-class WardSelectScreen extends StatefulWidget {
-  const WardSelectScreen({super.key});
+class WardSelectPage extends StatefulWidget {
+  const WardSelectPage({super.key});
 
   @override
-  State<WardSelectScreen> createState() => _WardSelectScreenState();
+  State<WardSelectPage> createState() => _WardSelectPageState();
 }
 
-class _WardSelectScreenState extends State<WardSelectScreen> {
+class _WardSelectPageState extends State<WardSelectPage> {
   static const _storage = FlutterSecureStorage();
 
-  static const _kHospitalCode = 'hospital_code';
-  static const _kSelectedWardJson = 'selected_ward_json';
+  static const _hospitalCodeStorageKey = 'hospital_code';
+  static const _selectedWardStorageKey = 'selected_ward_json';
 
   late final String _frontUrl;
 
@@ -93,13 +93,15 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
   @override
   void initState() {
     super.initState();
-    _frontUrl = Urlconfig.serverUrl.toString();
-    _loadHospitalCode();
+    _frontUrl = UrlConfig.serverUrl.toString();
+    _loadStoredHospitalCode();
   }
 
-  Future<void> _loadHospitalCode() async {
-    final codeStr = await _storage.read(key: _kHospitalCode);
-    hospitalCode = int.tryParse(codeStr ?? '');
+  Future<void> _loadStoredHospitalCode() async {
+    final storedHospitalCode = await _storage.read(
+      key: _hospitalCodeStorageKey,
+    );
+    hospitalCode = int.tryParse(storedHospitalCode ?? '');
     if (hospitalCode != null) {
       await _loadWards();
     } else {
@@ -131,21 +133,23 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
       if (data is! Map) throw Exception('병동 조회 data가 비었습니다.');
 
       final parts = data['parts'];
-      final List<WardItem> next = [];
+      final List<WardItem> wardItems = [];
       if (parts is List) {
-        for (final e in parts) {
-          if (e is Map<String, dynamic>) {
-            next.add(WardItem.fromJson(e));
-          } else if (e is Map) {
-            next.add(WardItem.fromJson(Map<String, dynamic>.from(e)));
+        for (final part in parts) {
+          if (part is Map<String, dynamic>) {
+            wardItems.add(WardItem.fromJson(part));
+          } else if (part is Map) {
+            wardItems.add(WardItem.fromJson(Map<String, dynamic>.from(part)));
           }
         }
       }
-      next.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      wardItems.sort((leftWard, rightWard) {
+        return leftWard.sortOrder.compareTo(rightWard.sortOrder);
+      });
 
       if (!mounted) return;
       setState(() {
-        wards = next;
+        wards = wardItems;
         wardsLoading = false;
       });
 
@@ -168,16 +172,16 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
     }
   }
 
-  Future<void> _onWardTap(WardItem w) async {
+  Future<void> _onWardTap(WardItem selectedWard) async {
     setState(() {
-      _selectedWard = w;
+      _selectedWard = selectedWard;
       _floors = [];
       _floorsLoading = true;
     });
 
     try {
       final uri = Uri.parse(
-        '$_frontUrl/api/hospital/structure/floor?hospital_st_code=${w.hospitalStCode}',
+        '$_frontUrl/api/hospital/structure/floor?hospital_st_code=${selectedWard.hospitalStCode}',
       );
       final decoded = await HttpHelper.getJson(uri);
 
@@ -188,21 +192,25 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
       if (data is! Map) throw Exception('층 조회 data가 비었습니다.');
 
       final rawFloors = data['floors'] ?? data['parts'];
-      final List<FloorItem> next = [];
+      final List<FloorItem> floorItems = [];
       if (rawFloors is List) {
-        for (final e in rawFloors) {
-          if (e is Map<String, dynamic>) {
-            next.add(FloorItem.fromJson(e));
-          } else if (e is Map) {
-            next.add(FloorItem.fromJson(Map<String, dynamic>.from(e)));
+        for (final floor in rawFloors) {
+          if (floor is Map<String, dynamic>) {
+            floorItems.add(FloorItem.fromJson(floor));
+          } else if (floor is Map) {
+            floorItems.add(
+              FloorItem.fromJson(Map<String, dynamic>.from(floor)),
+            );
           }
         }
       }
-      next.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      floorItems.sort((leftFloor, rightFloor) {
+        return leftFloor.sortOrder.compareTo(rightFloor.sortOrder);
+      });
 
       if (!mounted) return;
       setState(() {
-        _floors = next;
+        _floors = floorItems;
         _floorsLoading = false;
       });
     } catch (e) {
@@ -217,23 +225,23 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
   }
 
   Future<void> _confirmWard() async {
-    final w = _selectedWard;
-    if (w == null) {
+    final selectedWard = _selectedWard;
+    if (selectedWard == null) {
       _snack('병동을 선택해 주세요.');
       return;
     }
 
     await _storage.write(
-      key: _kSelectedWardJson,
-      value: jsonEncode(w.toJson()),
+      key: _selectedWardStorageKey,
+      value: jsonEncode(selectedWard.toJson()),
     );
     await _storage.write(
       key: StorageKeys.selectedWardStCode,
-      value: w.hospitalStCode.toString(),
+      value: selectedWard.hospitalStCode.toString(),
     );
     await _storage.write(
       key: StorageKeys.selectedWardName,
-      value: w.categoryName,
+      value: selectedWard.categoryName,
     );
 
     if (!mounted) return;
@@ -241,8 +249,8 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
   }
 
   Future<void> _showEditFloorSheet(FloorItem floor) async {
-    final ward = _selectedWard;
-    if (ward == null) return;
+    final selectedWard = _selectedWard;
+    if (selectedWard == null) return;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -250,14 +258,14 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
       builder: (_) => _EditFloorBottomSheet(
         frontUrl: _frontUrl,
         floor: floor,
-        onUpdated: () => _onWardTap(ward),
+        onUpdated: () => _onWardTap(selectedWard),
       ),
     );
   }
 
   Future<void> _showAddFloorSheet() async {
-    final ward = _selectedWard;
-    if (ward == null || hospitalCode == null) return;
+    final selectedWard = _selectedWard;
+    if (selectedWard == null || hospitalCode == null) return;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -265,8 +273,8 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
       builder: (_) => _AddFloorBottomSheet(
         frontUrl: _frontUrl,
         hospitalCode: hospitalCode!,
-        parentCode: ward.hospitalStCode,
-        onAdded: () => _onWardTap(ward),
+        parentCode: selectedWard.hospitalStCode,
+        onAdded: () => _onWardTap(selectedWard),
       ),
     );
   }
@@ -286,8 +294,8 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
   }
 
   Future<void> _backToLogin() async {
-    await _storage.delete(key: _kHospitalCode);
-    await _storage.delete(key: _kSelectedWardJson);
+    await _storage.delete(key: _hospitalCodeStorageKey);
+    await _storage.delete(key: _selectedWardStorageKey);
     await _storage.delete(key: StorageKeys.selectedWardStCode);
     await _storage.delete(key: StorageKeys.selectedWardName);
 
@@ -303,6 +311,7 @@ class _WardSelectScreenState extends State<WardSelectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: const Color(0xFFF3F4F6),
       body: Center(
         child: ConstrainedBox(
@@ -452,8 +461,10 @@ class _WardCard extends StatelessWidget {
                 // + 병동 추가 버튼
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF6B7280),
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF65C466),
                     minimumSize: const Size.fromHeight(48),
+                    overlayColor: Colors.transparent,
                     side: const BorderSide(color: Color(0xFFE5E7EB)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -515,19 +526,36 @@ class _WardSelectButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        backgroundColor: Colors.white,
-        foregroundColor: isSelected
-            ? const Color(0xFF65C466)
-            : const Color(0xFF374151),
-        minimumSize: const Size.fromHeight(48),
-        side: BorderSide(
-          color: isSelected ? const Color(0xFF65C466) : const Color(0xFFE5E7EB),
-          width: isSelected ? 1.5 : 1.0,
+      style: ButtonStyle(
+        minimumSize: const WidgetStatePropertyAll(Size.fromHeight(48)),
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (isSelected) {
+            return const Color(0xFFF0FDF4);
+          }
+          return Colors.white;
+        }),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (isSelected) {
+            return const Color(0xFF65C466);
+          }
+          return const Color(0xFF374151);
+        }),
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        side: WidgetStateProperty.resolveWith((states) {
+          return BorderSide(
+            color: isSelected
+                ? const Color(0xFF65C466)
+                : const Color(0xFFE5E7EB),
+            width: isSelected ? 1.5 : 1.0,
+          );
+        }),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-        elevation: 0,
+        textStyle: const WidgetStatePropertyAll(
+          TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+        elevation: const WidgetStatePropertyAll(0),
       ),
       onPressed: onTap,
       child: Text(ward.categoryName),
@@ -620,7 +648,7 @@ class _FloorCard extends StatelessWidget {
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF65C466),
-                    foregroundColor: Colors.white,
+                    foregroundColor: Color(0xFFFFFFFF),
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -782,123 +810,133 @@ class _AddWardBottomSheetState extends State<_AddWardBottomSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 핸들바
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const Text(
-            '병동 추가',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF111827),
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            '추가할 병동 이름을 입력해 주세요.',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _ctrl,
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _submit(),
-            decoration: InputDecoration(
-              hintText: '예) 1병동, 내과 병동',
-              filled: true,
-              fillColor: const Color(0xFFF3F4F6),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF93C5FD)),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                    side: const BorderSide(color: Color(0xFFE5E7EB)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 핸들바
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  onPressed: _loading
-                      ? null
-                      : () => Navigator.of(context).pop(),
-                  child: const Text('취소'),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF65C466),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    textStyle: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
-                    ),
-                    elevation: 0,
+                const Text(
+                  '병동 추가',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF111827),
                   ),
-                  onPressed: _loading ? null : _submit,
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '추가할 병동 이름을 입력해 주세요.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _ctrl,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                  decoration: InputDecoration(
+                    hintText: '예) 1병동, 내과 병동',
+                    filled: true,
+                    fillColor: const Color(0xFFF3F4F6),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF93C5FD)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          side: const BorderSide(color: Color(0xFFE5E7EB)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        )
-                      : const Text('추가'),
+                        ),
+                        onPressed: _loading
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF65C466),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: _loading ? null : _submit,
+                        child: _loading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('추가'),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -969,122 +1007,132 @@ class _AddFloorBottomSheetState extends State<_AddFloorBottomSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const Text(
-            '층 추가',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF111827),
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            '추가할 층 이름을 입력해 주세요.',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _ctrl,
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _submit(),
-            decoration: InputDecoration(
-              hintText: '예) 1층, 2층, 옥상',
-              filled: true,
-              fillColor: const Color(0xFFF3F4F6),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF93C5FD)),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                    side: const BorderSide(color: Color(0xFFE5E7EB)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  onPressed: _loading
-                      ? null
-                      : () => Navigator.of(context).pop(),
-                  child: const Text('취소'),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF65C466),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    textStyle: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
-                    ),
-                    elevation: 0,
+                const Text(
+                  '층 추가',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF111827),
                   ),
-                  onPressed: _loading ? null : _submit,
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '추가할 층 이름을 입력해 주세요.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _ctrl,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                  decoration: InputDecoration(
+                    hintText: '예) 1층, 2층, 옥상',
+                    filled: true,
+                    fillColor: const Color(0xFFF3F4F6),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF93C5FD)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          side: const BorderSide(color: Color(0xFFE5E7EB)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        )
-                      : const Text('추가'),
+                        ),
+                        onPressed: _loading
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF65C466),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: _loading ? null : _submit,
+                        child: _loading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('추가'),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1229,138 +1277,148 @@ class _EditFloorBottomSheetState extends State<_EditFloorBottomSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '층 수정',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF111827),
-                ),
-              ),
-              TextButton.icon(
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                onPressed: _loading ? null : _delete,
-                icon: const Icon(Icons.delete_outline, size: 18),
-                label: const Text('삭제'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            '층 이름과 정렬 순서를 수정해 주세요.',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            '층 이름',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: Color(0xFF374151),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _nameCtrl,
-            autofocus: true,
-            textInputAction: TextInputAction.next,
-            decoration: _deco('예) 1층, 2층'),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            '정렬 순서',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: Color(0xFF374151),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _orderCtrl,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _submit(),
-            decoration: _deco('예) 1, 2, 3'),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                    side: const BorderSide(color: Color(0xFFE5E7EB)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  onPressed: _loading
-                      ? null
-                      : () => Navigator.of(context).pop(),
-                  child: const Text('취소'),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF65C466),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '층 수정',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF111827),
+                      ),
                     ),
-                    textStyle: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
+                    TextButton.icon(
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      onPressed: _loading ? null : _delete,
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: const Text('삭제'),
                     ),
-                    elevation: 0,
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '층 이름과 정렬 순서를 수정해 주세요.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B7280),
                   ),
-                  onPressed: _loading ? null : _submit,
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  '층 이름',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: Color(0xFF374151),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _nameCtrl,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  decoration: _deco('예) 1층, 2층'),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  '정렬 순서',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: Color(0xFF374151),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _orderCtrl,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                  decoration: _deco('예) 1, 2, 3'),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          side: const BorderSide(color: Color(0xFFE5E7EB)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        )
-                      : const Text('수정'),
+                        ),
+                        onPressed: _loading
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: const Text('취소'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF65C466),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: _loading ? null : _submit,
+                        child: _loading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('수정'),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

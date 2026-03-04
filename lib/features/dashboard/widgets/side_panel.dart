@@ -6,8 +6,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 
-import '../../../urlConfig.dart';
-import '../../../storage_keys.dart';
+import 'package:mfps/url_config.dart';
+import 'package:mfps/storage_keys.dart';
 
 import 'patient_list_card.dart';
 import 'dialogs/patient_add_dialog.dart';
@@ -32,7 +32,7 @@ class _SidePanelState extends State<SidePanel> {
   static const _storage = FlutterSecureStorage();
   final ScrollController _scrollCtrl = ScrollController();
 
-  late final String _front_url;
+  late final String _frontUrl;
 
   bool _isLoading = true;
 
@@ -53,7 +53,7 @@ class _SidePanelState extends State<SidePanel> {
   @override
   void initState() {
     super.initState();
-    _front_url = Urlconfig.serverUrl.toString();
+    _frontUrl = UrlConfig.serverUrl.toString();
     loadData(); // 최초 로딩
     _startPolling();
   }
@@ -141,7 +141,7 @@ class _SidePanelState extends State<SidePanel> {
 
     try {
       final uri = Uri.parse(
-        '$_front_url/api/hospital/structure/patient-list?hospital_st_code=$floorStCode',
+        '$_frontUrl/api/hospital/structure/patient-list?hospital_st_code=$floorStCode',
       );
       final res = await http.get(uri, headers: {'Content-Type': 'application/json'});
 

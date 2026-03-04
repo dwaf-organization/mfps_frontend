@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-import '../../../urlConfig.dart';
-import '../../../storage_keys.dart';
+import 'package:mfps/url_config.dart';
+import 'package:mfps/storage_keys.dart';
 
 class SummaryCards extends StatefulWidget {
   /// 대시보드에서 선택된 층 hospital_st_code
@@ -35,7 +35,7 @@ class _SummaryCardsState extends State<SummaryCards> {
   @override
   void initState() {
     super.initState();
-    _frontUrl = Urlconfig.serverUrl.toString();
+    _frontUrl = UrlConfig.serverUrl.toString();
     loadData();
   }
 
