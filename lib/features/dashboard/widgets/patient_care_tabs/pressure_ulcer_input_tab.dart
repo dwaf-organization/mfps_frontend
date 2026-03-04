@@ -1,110 +1,10 @@
-import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:mfps/features/dashboard/widgets/patient_care_tabs/incontinence_tab.dart';
-import 'package:mfps/features/dashboard/widgets/patient_care_tabs/patient_care_tab_header.dart';
-import 'package:mfps/features/dashboard/widgets/patient_care_tabs/pressure_ulcer_info_tab.dart';
-import 'package:mfps/features/meal/meal_tab.dart';
-import 'package:mfps/url_config.dart';
-import 'package:mfps/api/http_helper.dart';
-
-/// 케어 입력 페이지 (욕창단계입력 / 욕창정보 / 식단 / 실금)
-class PatientCarePage extends StatefulWidget {
-  final int patientCode;
-  final String patientName;
-  final String? roomLabel;
-  final String? bedLabel;
-
-  const PatientCarePage({
-    super.key,
-    required this.patientCode,
-    required this.patientName,
-    this.roomLabel,
-    this.bedLabel,
-  });
-
-  @override
-  State<PatientCarePage> createState() => _PatientCarePageState();
-}
-
-class _PatientCarePageState extends State<PatientCarePage>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFFFFFF),
-        elevation: 0,
-        title: Text(
-          '${widget.patientName} 케어 입력',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF111827),
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF374151)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: const Divider(height: 1, color: Color(0xFFE5E7EB)),
-        ),
-      ),
-      body: Column(
-        children: [
-          // 탭 바
-          PatientCareTabHeader(tabController: _tabController),
-
-          // 탭 내용
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // 탭 1: 욕창단계입력
-                _PressureUlcerInputTab(patientCode: widget.patientCode),
-
-                // 탭 2: 욕창정보
-                const PressureUlcerInfoTab(),
-
-                // 탭 3: 식단
-                const Center(child: MealTab()),
-
-                // 탭 4: 실금
-                const IncontinenceTab(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════
-// 욕창단계입력 (Pressure Ulcer Stage Input)
-// ══════════════════════════════════════════════════════════════
+part of '../../pages/patient_care_page.dart';
 
 class _PressurePoint {
   final String name;
   final double x; // 0..1 fraction of image width
   final double y; // 0..1 fraction of image height
-  final bool labelLeft; // true → label on left side
+  final bool labelLeft; // true -> label on left side
   const _PressurePoint(this.name, this.x, this.y, this.labelLeft);
 }
 
@@ -141,8 +41,25 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
   bool _isLogLoading = false;
   Map<String, List<Map<String, dynamic>>> _chartData = {};
 
+  static const _apiNameToPointName = <String, String>{
+    '좌측 귀': '귀(좌)',
+    '우측 귀': '귀(우)',
+    '후두부': '후두부',
+    '좌측 어깨뼈': '어깨뼈(좌)',
+    '우측 어깨뼈': '어깨뼈(우)',
+    '등': '등',
+    '엉치뼈': '엉치뼈',
+    '좌골': '좌골',
+    '좌측 엉덩이옆': '엉덩이옆(좌)',
+    '우측 엉덩이옆': '엉덩이옆(우)',
+    '좌측 무릎': '무릎(좌)',
+    '우측 무릎': '무릎(우)',
+    '좌측 복숭아뼈': '복숭아뼈(좌)',
+    '우측 복숭아뼈': '복숭아뼈(우)',
+    '좌측 뒤꿈치': '뒷꿈치(좌)',
+    '우측 뒤꿈치': '뒷꿈치(우)',
+  };
 
-  // part_code(서버) ↔ 화면 포인트 이름 매핑
   static const _partCodeToPointName = <int, String>{
     1: '귀(좌)',
     2: '귀(우)',
@@ -181,6 +98,42 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
     '뒷꿈치(우)': 16,
   };
 
+  static const _centerPoints = <String>{'후두부', '등', '엉치뼈', '좌골'};
+
+  static const _centerOffsets = <String, Offset>{
+    '엉치뼈': Offset(0, -10),
+    '좌골': Offset(0, 20),
+  };
+
+  static const _kPoints = <_PressurePoint>[
+    _PressurePoint('후두부', 0.50, 0.05, true),
+    _PressurePoint('귀(좌)', 0.38, 0.07, true),
+    _PressurePoint('귀(우)', 0.62, 0.07, false),
+    _PressurePoint('어깨뼈(좌)', 0.30, 0.19, true),
+    _PressurePoint('어깨뼈(우)', 0.70, 0.19, false),
+    _PressurePoint('등', 0.50, 0.30, true),
+    _PressurePoint('엉치뼈', 0.50, 0.45, true),
+    _PressurePoint('엉덩이옆(좌)', 0.23, 0.48, true),
+    _PressurePoint('좌골', 0.50, 0.50, true),
+    _PressurePoint('엉덩이옆(우)', 0.77, 0.48, false),
+    _PressurePoint('무릎(좌)', 0.37, 0.68, true),
+    _PressurePoint('무릎(우)', 0.63, 0.68, false),
+    _PressurePoint('복숭아뼈(좌)', 0.38, 0.87, true),
+    _PressurePoint('복숭아뼈(우)', 0.62, 0.87, false),
+    _PressurePoint('뒷꿈치(좌)', 0.38, 0.95, true),
+    _PressurePoint('뒷꿈치(우)', 0.62, 0.95, false),
+  ];
+
+  static const _stageColors = <Color>[
+    Color(0xFF3B82F6),
+    Color(0xFFFCA5A5),
+    Color(0xFFF87171),
+    Color(0xFFEF4444),
+    Color(0xFFB91C1C),
+  ];
+
+  String? _activeCenterName;
+
   @override
   void initState() {
     super.initState();
@@ -202,7 +155,6 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
       if (data == null) return;
 
       final itemsRaw = data['records'] as List<dynamic>? ?? const [];
-
       final entries = itemsRaw.map((raw) {
         final item = raw as Map<String, dynamic>;
         return _PressureUlcerLogEntry(
@@ -244,9 +196,7 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
 
       final newChartData = <String, List<Map<String, dynamic>>>{};
       for (final entry in raw.entries) {
-        final partCode = int.tryParse(entry.key);
-        if (partCode == null) continue;
-        final localName = _partCodeToPointName[partCode];
+        final localName = _apiNameToPointName[entry.key];
         if (localName == null) continue;
         newChartData[localName] =
             (entry.value as List).cast<Map<String, dynamic>>();
@@ -303,41 +253,6 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
-  static const _centerPoints = <String>{'후두부', '등', '엉치뼈', '좌골'};
-  String? _activeCenterName;
-
-  static const _centerOffsets = <String, Offset>{
-    '엉치뼈': Offset(0, -10),
-    '좌골': Offset(0, 20),
-  };
-
-  static const _kPoints = <_PressurePoint>[
-    _PressurePoint('후두부', 0.50, 0.05, true),
-    _PressurePoint('귀(좌)', 0.38, 0.07, true),
-    _PressurePoint('귀(우)', 0.62, 0.07, false),
-    _PressurePoint('어깨뼈(좌)', 0.30, 0.19, true),
-    _PressurePoint('어깨뼈(우)', 0.70, 0.19, false),
-    _PressurePoint('등', 0.50, 0.30, true),
-    _PressurePoint('엉치뼈', 0.50, 0.45, true),
-    _PressurePoint('엉덩이옆(좌)', 0.23, 0.48, true),
-    _PressurePoint('좌골', 0.50, 0.50, true),
-    _PressurePoint('엉덩이옆(우)', 0.77, 0.48, false),
-    _PressurePoint('무릎(좌)', 0.37, 0.68, true),
-    _PressurePoint('무릎(우)', 0.63, 0.68, false),
-    _PressurePoint('복숭아뼈(좌)', 0.38, 0.87, true),
-    _PressurePoint('복숭아뼈(우)', 0.62, 0.87, false),
-    _PressurePoint('뒷꿈치(좌)', 0.38, 0.95, true),
-    _PressurePoint('뒷꿈치(우)', 0.62, 0.95, false),
-  ];
-
-  static const _stageColors = <Color>[
-    Color(0xFF3B82F6), // 미선택 — blue
-    Color(0xFFFCA5A5), // 1단계 — light red
-    Color(0xFFF87171), // 2단계 — medium red
-    Color(0xFFEF4444), // 3단계 — strong red
-    Color(0xFFB91C1C), // 4단계 — dark red
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -567,10 +482,8 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
     );
   }
 
-  // 서버가 내려주는 total_pages 직접 사용
   int get _totalLogPages => _serverTotalPages.clamp(1, 9999);
 
-  // API가 현재 페이지 데이터만 반환하므로 전체를 그대로 표시
   List<_PressureUlcerLogEntry> get _visiblePressureUlcerLogs =>
       _pressureUlcerLogs;
 
@@ -589,7 +502,6 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
       return;
     }
 
-    // 삭제 성공 후 내역·현재상태·그래프 모두 갱신
     final targetPage =
         _pressureUlcerLogs.length == 1 && _currentLogPage > 1
             ? _currentLogPage - 1
@@ -728,15 +640,15 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
           color: isActive
               ? const Color(0xFF4F83C1)
               : stage != null
-              ? color
-              : Colors.white,
+                  ? color
+                  : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
                 ? const Color(0xFF4F83C1)
                 : stage != null
-                ? color
-                : const Color(0xFF4F83C1),
+                    ? color
+                    : const Color(0xFF4F83C1),
           ),
           boxShadow: const [
             BoxShadow(
@@ -752,8 +664,8 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
             color: isActive
                 ? Colors.white
                 : stage != null
-                ? Colors.white
-                : const Color(0xFF4F83C1),
+                    ? Colors.white
+                    : const Color(0xFF4F83C1),
             fontSize: 12,
             fontWeight: FontWeight.w800,
           ),
@@ -785,12 +697,9 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
   ) {
     final baseX = imgLeft + imgW * p.x;
     final baseY = imgTop + imgH * p.y;
-
     final offset = _centerOffsets[p.name] ?? Offset.zero;
-
     final x = baseX + offset.dx;
     final y = baseY + offset.dy;
-
     final stage = _stages[p.name];
     final color = _stageColors[stage ?? 0];
     final label = stage != null ? '${p.name} ($stage단계)' : p.name;
@@ -822,15 +731,15 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                 color: isActive
                     ? const Color(0xFF4F83C1)
                     : stage != null
-                    ? color
-                    : Colors.white,
+                        ? color
+                        : Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive
                       ? const Color(0xFF4F83C1)
                       : stage != null
-                      ? color
-                      : const Color(0xFF4F83C1),
+                          ? color
+                          : const Color(0xFF4F83C1),
                 ),
               ),
               child: Text(
@@ -839,8 +748,8 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                   color: isActive
                       ? Colors.white
                       : stage != null
-                      ? Colors.white
-                      : const Color(0xFF4F83C1),
+                          ? Colors.white
+                          : const Color(0xFF4F83C1),
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                 ),
@@ -954,7 +863,6 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                       spacing: 12,
                       runSpacing: 12,
                       children: [
-                        // 없음 버튼 (0단계)
                         OutlinedButton(
                           onPressed: () {
                             setSheetState(() => selectedStage = 0);
@@ -980,7 +888,6 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                             style: TextStyle(fontWeight: FontWeight.w500),
                           ),
                         ),
-                        // 1~4단계 버튼
                         ...List.generate(4, (index) {
                           final stage = index + 1;
                           final isSelected = selectedStage == stage;
@@ -1006,7 +913,9 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
                             ),
                             child: Text(
                               '$stage단계',
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           );
                         }),
@@ -1140,7 +1049,6 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
     if (result != null) {
       setState(() {
         if (result == 0) {
-          // 없음 선택 시 해당 부위 초기화
           _stages.remove(name);
           _notes.remove(name);
         } else {
@@ -1158,7 +1066,6 @@ class _PressureUlcerInputTabState extends State<_PressureUlcerInputTab> {
   }
 }
 
-/// 도트 ↔ 라벨 버튼 사이의 연결선만 그리는 페인터
 class _ConnectionLinePainter extends CustomPainter {
   final List<_PressurePoint> points;
   final Map<String, int> stages;
@@ -1335,11 +1242,11 @@ class _PressureGraphExpandedView extends StatelessWidget {
 
 Color _ulcerStageColor(int maxStage) {
   const colors = [
-    Color(0xFFD1D5DB), // 데이터 없음 — gray
-    Color(0xFFFCA5A5), // 1단계 — light pink
-    Color(0xFFF87171), // 2단계 — medium red
-    Color(0xFFEF4444), // 3단계 — strong red
-    Color(0xFFB91C1C), // 4단계 — dark red
+    Color(0xFFD1D5DB),
+    Color(0xFFFCA5A5),
+    Color(0xFFF87171),
+    Color(0xFFEF4444),
+    Color(0xFFB91C1C),
   ];
   if (maxStage < 1 || maxStage > 4) return colors[0];
   return colors[maxStage];
@@ -1351,18 +1258,18 @@ Widget _buildPressureLineChart({
   double lineWidth = 2,
   double dotRadius = 3,
 }) {
-  // 데이터 없음 → (0, 0) 단일 점으로 표시 (0단계와 동일한 회색)
   final effectiveData = chartData.isEmpty
       ? [<String, dynamic>{'date': '', 'stage_level': 0}]
       : chartData;
 
   final spots = <FlSpot>[
     for (int i = 0; i < effectiveData.length; i++)
-      FlSpot(i.toDouble(),
-          (effectiveData[i]['stage_level'] as int? ?? 0).toDouble()),
+      FlSpot(
+        i.toDouble(),
+        (effectiveData[i]['stage_level'] as int? ?? 0).toDouble(),
+      ),
   ];
 
-  // 가장 최근(마지막) 항목의 단계 기준으로 색상 결정 (0 → 회색)
   final latestStage = effectiveData.last['stage_level'] as int? ?? 0;
   final lineColor = _ulcerStageColor(latestStage);
 
@@ -1442,77 +1349,4 @@ Widget _buildPressureLineChart({
       ],
     ),
   );
-}
-
-//욕창 단계정보
-class StageRow extends StatelessWidget {
-  final String title;
-  final String description;
-  final String diagramAsset;
-  final bool showBottomBorder;
-
-  const StageRow({
-    super.key,
-    required this.title,
-    required this.description,
-    required this.diagramAsset,
-    this.showBottomBorder = true,
-    // required this.photoAsset,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        border: showBottomBorder
-            ? const Border(
-                bottom: BorderSide(color: Color(0xFF6DC16A), width: 1),
-              )
-            : null, // ✅ 마지막이면 보더 없음
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 왼쪽 텍스트
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF374151),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 20),
-
-          // 오른쪽 이미지
-          Expanded(
-            flex: 2,
-            child: Column(
-              children: [
-                SizedBox(height: 130, child: Image.asset(diagramAsset)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
