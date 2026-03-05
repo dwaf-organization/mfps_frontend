@@ -472,128 +472,149 @@ class _SettingsDialogState extends State<SettingsDialog> {
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      // ✅ (추가) 다이얼로그 내부 스낵바 영역 고정
       child: ScaffoldMessenger(
         key: _messengerKey,
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          body: Container(
-            width: 1120,
-            height: 720,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x14000000),
-                  blurRadius: 20,
-                  offset: Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 16, 10, 12),
-                  child: Row(
-                    children: [
-                      const Text('설정',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
+          body: Center(
+            child: Container(
+              width: 1120,
+              height: 720,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x14000000),
+                    blurRadius: 20,
+                    offset: Offset(0, 10),
                   ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: Row(
-                    children: [
-                      // 좌측 메뉴
-                      Container(
-                        width: 300,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          border: Border(right: BorderSide(color: Color(0xFFE5E7EB))),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 10, 12),
+                    child: Row(
+                      children: [
+                        const Text(
+                          '설정',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                        child: ListView(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          children: [
-                            const _MenuTitle('회원 관리'),
-                            _MenuItem(
-                              title: '회원정보',
-                              icon: Icons.badge_outlined,
-                              selected: _section == SettingsSection.accountInfo,
-                              onTap: () async {
-                                setState(() => _section = SettingsSection.accountInfo);
-                                await loadData();
-                              },
-                            ),
-                            _MenuItem(
-                              title: '비밀번호 변경',
-                              icon: Icons.lock_outline,
-                              selected: _section == SettingsSection.password,
-                              onTap: () => setState(() => _section = SettingsSection.password),
-                            ),
-                            _MenuItem(
-                              title: '회원 탈퇴',
-                              icon: Icons.delete_outline,
-                              danger: true,
-                              selected: _section == SettingsSection.withdraw,
-                              onTap: () => setState(() => _section = SettingsSection.withdraw),
-                            ),
-                            const SizedBox(height: 10),
-                            const Divider(height: 1),
-                            const SizedBox(height: 10),
-                            const _MenuTitle('병동 관리'),
-                            _MenuItem(
-                              title: '병동 관리',
-                              icon: Icons.apartment_outlined,
-                              selected: _section == SettingsSection.wardManage,
-                              onTap: () async {
-                                setState(() => _section = SettingsSection.wardManage);
-                                await loadData();
-                              },
-                            ),
-                            const SizedBox(height: 10),
-                            const Divider(height: 1),
-                            const SizedBox(height: 10),
-                            const _MenuTitle('내 설정'),
-                            _MenuItem(
-                              title: '내 설정',
-                              icon: Icons.tune,
-                              selected: _section == SettingsSection.mySettings,
-                              onTap: () => setState(() => _section = SettingsSection.mySettings),
-                            ),
-                            const SizedBox(height: 10),
-                            const Divider(height: 1),
-                            const SizedBox(height: 10),
-                            const _MenuTitle('시스템 정보'),
-                            _MenuItem(
-                              title: '앱 버전',
-                              icon: Icons.info_outline,
-                              selected: _section == SettingsSection.systemInfo,
-                              onTap: () => setState(() => _section = SettingsSection.systemInfo),
-                            ),
-                          ],
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
                         ),
-                      ),
-                      // 우측 내용
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(18),
-                          child: _loading
-                              ? const Center(child: CircularProgressIndicator())
-                              : _buildContent(),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const Divider(height: 1),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 300,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            border: Border(
+                              right: BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                          ),
+                          child: ListView(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            children: [
+                              const _MenuTitle('회원 관리'),
+                              _MenuItem(
+                                title: '회원정보',
+                                icon: Icons.badge_outlined,
+                                selected:
+                                    _section == SettingsSection.accountInfo,
+                                onTap: () async {
+                                  setState(() {
+                                    _section = SettingsSection.accountInfo;
+                                  });
+                                  await loadData();
+                                },
+                              ),
+                              _MenuItem(
+                                title: '비밀번호 변경',
+                                icon: Icons.lock_outline,
+                                selected: _section == SettingsSection.password,
+                                onTap: () => setState(() {
+                                  _section = SettingsSection.password;
+                                }),
+                              ),
+                              _MenuItem(
+                                title: '회원 탈퇴',
+                                icon: Icons.delete_outline,
+                                danger: true,
+                                selected: _section == SettingsSection.withdraw,
+                                onTap: () => setState(() {
+                                  _section = SettingsSection.withdraw;
+                                }),
+                              ),
+                              const SizedBox(height: 10),
+                              const Divider(height: 1),
+                              const SizedBox(height: 10),
+                              const _MenuTitle('병동 관리'),
+                              _MenuItem(
+                                title: '병동 관리',
+                                icon: Icons.apartment_outlined,
+                                selected: _section == SettingsSection.wardManage,
+                                onTap: () async {
+                                  setState(() {
+                                    _section = SettingsSection.wardManage;
+                                  });
+                                  await loadData();
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                              const Divider(height: 1),
+                              const SizedBox(height: 10),
+                              const _MenuTitle('내 설정'),
+                              _MenuItem(
+                                title: '내 설정',
+                                icon: Icons.tune,
+                                selected: _section == SettingsSection.mySettings,
+                                onTap: () => setState(() {
+                                  _section = SettingsSection.mySettings;
+                                }),
+                              ),
+                              const SizedBox(height: 10),
+                              const Divider(height: 1),
+                              const SizedBox(height: 10),
+                              const _MenuTitle('시스템 정보'),
+                              _MenuItem(
+                                title: '앱 버전',
+                                icon: Icons.info_outline,
+                                selected: _section == SettingsSection.systemInfo,
+                                onTap: () => setState(() {
+                                  _section = SettingsSection.systemInfo;
+                                }),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(18),
+                            child: _loading
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : _buildContent(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1086,47 +1107,57 @@ class _PasswordChangeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+
     return _PanelCard(
       title: '비밀번호 변경',
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          TextField(
-            controller: newPwCtrl,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: '새 비밀번호',
-              filled: true,
-              fillColor: const Color(0xFFF9FAFB),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 12),
+            TextField(
+              controller: newPwCtrl,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: '새 비밀번호',
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: newPwVerifyCtrl,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: '새 비밀번호 확인',
-              filled: true,
-              fillColor: const Color(0xFFF9FAFB),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: newPwVerifyCtrl,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: '새 비밀번호 확인',
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(
-              onPressed: saving ? null : onSubmit,
-              child: saving
-                  ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-                  : const Text('변경'),
+            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                onPressed: saving ? null : onSubmit,
+                child: saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('변경'),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

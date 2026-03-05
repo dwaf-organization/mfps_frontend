@@ -19,10 +19,7 @@ enum PatientTab { all, danger, warning, stable }
 class SidePanel extends StatefulWidget {
   final int? floorStCode;
 
-  const SidePanel({
-    super.key,
-    required this.floorStCode,
-  });
+  const SidePanel({super.key, required this.floorStCode});
 
   @override
   State<SidePanel> createState() => _SidePanelState();
@@ -143,7 +140,10 @@ class _SidePanelState extends State<SidePanel> {
       final uri = Uri.parse(
         '$_frontUrl/api/hospital/structure/patient-list?hospital_st_code=$floorStCode',
       );
-      final res = await http.get(uri, headers: {'Content-Type': 'application/json'});
+      final res = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
 
       debugPrint('[PATIENT_LIST] status=${res.statusCode}');
       debugPrint('[PATIENT_LIST] body=${res.body}');
@@ -180,17 +180,21 @@ class _SidePanelState extends State<SidePanel> {
           final name = (p['patient_name']?.toString() ?? '').trim();
           final room = (p['patient_room']?.toString() ?? '').trim();
           final bed = (p['patient_bed']?.toString() ?? '').trim();
-          final warn = int.tryParse(p['patient_warning']?.toString() ?? '') ?? 0;
+          final warn =
+              int.tryParse(p['patient_warning']?.toString() ?? '') ?? 0;
 
           if (code <= 0) continue;
 
-          list.add(FloorPatientItem(
-            patientCode: code,
-            patientName: name.isEmpty ? '이름없음' : name,
-            patientRoom: room.isEmpty ? '-' : room,
-            patientBed: bed.isEmpty ? '-' : bed,
-            patientWarning: warn, // ✅ 0=안전, 1=경고, 2=위험 (아이콘 색은 PatientListCard에서 매핑)
-          ));
+          list.add(
+            FloorPatientItem(
+              patientCode: code,
+              patientName: name.isEmpty ? '이름없음' : name,
+              patientRoom: room.isEmpty ? '-' : room,
+              patientBed: bed.isEmpty ? '-' : bed,
+              patientWarning:
+                  warn, // ✅ 0=안전, 1=경고, 2=위험 (아이콘 색은 PatientListCard에서 매핑)
+            ),
+          );
         }
       }
 
@@ -239,11 +243,20 @@ class _SidePanelState extends State<SidePanel> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('환자 목록', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                    const Text(
+                      '환자 목록',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       '총 ${_allPatients.length}명',
-                      style: const TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
@@ -253,8 +266,13 @@ class _SidePanelState extends State<SidePanel> {
                     backgroundColor: const Color(0xFF22C55E),
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                   ),
                   onPressed: () async {
                     final ok = await showDialog<bool>(
@@ -266,54 +284,56 @@ class _SidePanelState extends State<SidePanel> {
                     }
                   },
                   icon: const Icon(Icons.add),
-                  label: const Text('추가', style: TextStyle(fontWeight: FontWeight.w900)),
+                  label: const Text(
+                    '추가',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
                 ),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
-            child: _Tabs(
-              tab: _tab,
-              onChanged: (t) => setState(() => _tab = t),
-            ),
+            child: _Tabs(tab: _tab, onChanged: (t) => setState(() => _tab = t)),
           ),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : Scrollbar(
-              controller: _scrollCtrl,
-              thumbVisibility: true,
-              child: ListView.separated(
-                controller: _scrollCtrl,
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                itemCount: patients.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, i) {
-                  final p = patients[i];
-                  return PatientListCard(
-                    patient: p,
-                    selected: _selectedPatientCode == p.patientCode,
-                    onTap: () async {
-                      setState(() => _selectedPatientCode = p.patientCode);
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PatientDetailPage(
-                            patientCode: p.patientCode,
-                            roomLabel: p.patientRoom,
-                            bedLabel: p.patientBed,
-                            onRefresh: loadData,
-                          ),
-                        ),
-                      );
-                      setState(() => _selectedPatientCode = null);
-                      await loadData();
-                    },
-                  );
-                },
-              ),
-            ),
+                    controller: _scrollCtrl,
+                    thumbVisibility: true,
+                    child: ListView.separated(
+                      controller: _scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                      itemCount: patients.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, i) {
+                        final p = patients[i];
+                        return PatientListCard(
+                          patient: p,
+                          selected: _selectedPatientCode == p.patientCode,
+                          onTap: () async {
+                            setState(
+                              () => _selectedPatientCode = p.patientCode,
+                            );
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PatientDetailPage(
+                                  patientCode: p.patientCode,
+                                  roomLabel: p.patientRoom,
+                                  bedLabel: p.patientBed,
+                                  onRefresh: loadData,
+                                ),
+                              ),
+                            );
+                            setState(() => _selectedPatientCode = null);
+                            await loadData();
+                          },
+                        );
+                      },
+                    ),
+                  ),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 18),
@@ -366,7 +386,10 @@ class _Tabs extends StatelessWidget {
               color: selected ? const Color(0xFFE5E7EB) : Colors.transparent,
             ),
           ),
-          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
         ),
       );
     }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import './dialogs/settings_dialog.dart';
+import 'package:mfps/features/notification/notification_store.dart';
 
 class TopHeader extends StatefulWidget {
   /// ✅ API에서 내려온 floors 원본 그대로 받기
@@ -136,10 +137,13 @@ class _TopHeaderState extends State<TopHeader> {
 
           const Spacer(),
 
-          _IconWithDot(
-            icon: Icons.notifications_outlined,
-            dot: false,
-            onTap: () => context.push('/notification'),
+          ListenableBuilder(
+            listenable: NotificationStore.instance,
+            builder: (_, _) => _IconWithDot(
+              icon: Icons.notifications_outlined,
+              dot: NotificationStore.instance.unreadCount > 0,
+              onTap: () => context.push('/notification'),
+            ),
           ),
           const SizedBox(width: 4),
           _IconWithDot(

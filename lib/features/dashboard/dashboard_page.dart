@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,8 @@ import 'widgets/summary_cards.dart';
 import 'widgets/side_panel.dart';
 import 'widgets/room_card.dart';
 import 'package:mfps/api/http_helper.dart';
+import 'package:mfps/features/notification/risk_poller.dart';
+import 'package:mfps/features/notification/widgets/danger_alert_dialog.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -28,6 +31,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Map<String, dynamic> data = {};
 
   bool _isLoading = true;
+
+  StreamSubscription<List<RiskPatient>>? _riskSub;
 
   String wardName = '전체';
 
@@ -52,6 +57,27 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _frontUrl = UrlConfig.serverUrl.toString();
     loadData();
+    _startRiskPoller();
+  }
+
+  void _startRiskPoller() {
+    RiskPoller.instance.start(_frontUrl);
+    _riskSub = RiskPoller.instance.stream.listen((patients) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => DangerAlertDialog(patients: patients),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _riskSub?.cancel();
+    RiskPoller.instance.stop();
+    _scrollCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> loadData() async {
